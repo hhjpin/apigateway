@@ -17,6 +17,11 @@ type ServerTableMap struct {
 	internal map[string]*Server
 }
 
+type ServiceTableMap struct {
+	sync.RWMutex
+	internal map[*Service]*Router
+}
+
 func NewRouteTableMap() *RouteTableMap {
 	return &RouteTableMap{
 		internal: make(map[string]*Router),
@@ -91,3 +96,29 @@ func (m *ServerTableMap) Store(key string, value *Server) {
 	m.internal[key] = value
 	m.Unlock()
 }
+
+func NewServiceTableMap() *ServiceTableMap {
+	return &ServiceTableMap{
+		internal: make(map[*Service]*Router),
+	}
+}
+
+func (m *ServiceTableMap) Load(key *Service) (value *Router, ok bool) {
+	m.RLock()
+	value, ok = m.internal[key]
+	m.RUnlock()
+	return value, ok
+}
+
+func (m *ServiceTableMap) Delete(key *Service) {
+	m.Lock()
+	delete(m.internal, key)
+	m.Unlock()
+}
+
+func (m *ServiceTableMap) Store(key *Service, value *Router) {
+	m.Lock()
+	m.internal[key] = value
+	m.Unlock()
+}
+
