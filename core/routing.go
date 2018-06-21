@@ -9,21 +9,21 @@ type RouteTable struct {
 	Version []byte
 
 	// frontend-api/router mapping table
-	table       RouteTableMap
+	table RouteTableMap
 	// online frontend-api/router mapping table
 	onlineTable OnlineRouteTableMap
 	// service/router reverse mapping table
-	srvTable    ServiceTableMap
+	srvTable ServiceTableMap
 }
 
 type Api struct {
-	path       []byte
+	path []byte
 	// string type of path variable, used for indexing mapping table
 	pathString string
 }
 
 type HealthCheck struct {
-	path      []byte
+	path []byte
 
 	// timeout default is 5 sec. When timed out, will retry to check again based on 'retry' switch on or not
 	timeout   uint8
@@ -40,8 +40,8 @@ type Server struct {
 	port   uint8
 	status uint8 // 0 -> offline, 1 -> online, 2 -> breakdown
 
-	healthCheck HealthCheck
-	rate        RateLimit
+	healthCheck *HealthCheck
+	rate        *RateLimit
 }
 
 type Service struct {
@@ -93,6 +93,21 @@ func (r *RouteTable) RemoveFrontendApi(path []byte) (ok bool) {
 func (r *RouteTable) CreateServer(host []byte, port uint8) {}
 
 func RemoveServer() {}
+
+func CreateHealthCheck(path []byte, timeout uint8, interval uint8, retry bool, retryTime uint8) *HealthCheck {
+
+	return &HealthCheck{
+		path: path,
+		timeout: timeout,
+		interval: interval,
+		retry: retry,
+		retryTime: retryTime,
+	}
+}
+
+func (s *Server) HealthCheck() *HealthCheck {
+	return s.healthCheck
+}
 
 func CreateService() {}
 
