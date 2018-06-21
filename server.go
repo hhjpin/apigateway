@@ -1,10 +1,10 @@
 package main
 
 import (
-	"config"
+	"api_gateway/utils"
 	"fmt"
 	"github.com/valyala/fasthttp"
-	"proxy"
+	"api_gateway/core"
 )
 
 var (
@@ -19,16 +19,16 @@ func main() {
 	var server *fasthttp.Server
 
 	server = &fasthttp.Server{
-		Handler: proxy.MainRequestHandler,
+		Handler: core.MainRequestHandler,
 
-		Name:               config.Conf.Server.Name,
-		Concurrency:        config.Conf.Server.Concurrency,
-		ReadBufferSize:     config.Conf.Server.ReadBufferSize,
-		WriteBufferSize:    config.Conf.Server.WriteBufferSize,
-		DisableKeepalive:   config.Conf.Server.DisabledKeepAlive,
-		ReduceMemoryUsage:  config.Conf.Server.ReduceMemoryUsage,
-		MaxRequestBodySize: config.Conf.Server.MaxRequestBodySize,
+		Name:               utils.Conf.Server.Name,
+		Concurrency:        utils.Conf.Server.Concurrency,
+		ReadBufferSize:     utils.Conf.Server.ReadBufferSize,
+		WriteBufferSize:    utils.Conf.Server.WriteBufferSize,
+		DisableKeepalive:   utils.Conf.Server.DisabledKeepAlive,
+		ReduceMemoryUsage:  utils.Conf.Server.ReduceMemoryUsage,
+		MaxRequestBodySize: utils.Conf.Server.MaxRequestBodySize,
 	}
 
-	server.ListenAndServe(fmt.Sprintf("%s:%d", config.Conf.Server.ListenHost, config.Conf.Server.ListenPort))
+	server.ListenAndServe(fmt.Sprintf("%s:%d", utils.Conf.Server.ListenHost, utils.Conf.Server.ListenPort))
 }
