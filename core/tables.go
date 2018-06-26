@@ -4,44 +4,44 @@ import "sync"
 
 type RouteTableMap struct {
 	sync.RWMutex
-	internal map[string]*Router
+	internal map[FrontApiString]*Router
 }
 
 type OnlineRouteTableMap struct {
 	sync.RWMutex
-	internal map[string]*Router
+	internal map[FrontApiString]*Router
 }
 
 type ServerTableMap struct {
 	sync.RWMutex
-	internal map[string]*Server
+	internal map[ServerNameString]*Server
 }
 
 type ServiceTableMap struct {
 	sync.RWMutex
-	internal map[*Service]*Router
+	internal map[ServiceNameString]*Service
 }
 
 func NewRouteTableMap() *RouteTableMap {
 	return &RouteTableMap{
-		internal: make(map[string]*Router),
+		internal: make(map[FrontApiString]*Router),
 	}
 }
 
-func (m *RouteTableMap) Load(key string) (value *Router, ok bool) {
+func (m *RouteTableMap) Load(key FrontApiString) (value *Router, ok bool) {
 	m.RLock()
 	value, ok = m.internal[key]
 	m.RUnlock()
 	return value, ok
 }
 
-func (m *RouteTableMap) Delete(key string) {
+func (m *RouteTableMap) Delete(key FrontApiString) {
 	m.Lock()
 	delete(m.internal, key)
 	m.Unlock()
 }
 
-func (m *RouteTableMap) Store(key string, value *Router) {
+func (m *RouteTableMap) Store(key FrontApiString, value *Router) {
 	m.Lock()
 	m.internal[key] = value
 	m.Unlock()
@@ -49,24 +49,24 @@ func (m *RouteTableMap) Store(key string, value *Router) {
 
 func NewOnlineRouteTableMap() *OnlineRouteTableMap {
 	return &OnlineRouteTableMap{
-		internal: make(map[string]*Router),
+		internal: make(map[FrontApiString]*Router),
 	}
 }
 
-func (m *OnlineRouteTableMap) Load(key string) (value *Router, ok bool) {
+func (m *OnlineRouteTableMap) Load(key FrontApiString) (value *Router, ok bool) {
 	m.RLock()
 	value, ok = m.internal[key]
 	m.RUnlock()
 	return value, ok
 }
 
-func (m *OnlineRouteTableMap) Delete(key string) {
+func (m *OnlineRouteTableMap) Delete(key FrontApiString) {
 	m.Lock()
 	delete(m.internal, key)
 	m.Unlock()
 }
 
-func (m *OnlineRouteTableMap) Store(key string, value *Router) {
+func (m *OnlineRouteTableMap) Store(key FrontApiString, value *Router) {
 	m.Lock()
 	m.internal[key] = value
 	m.Unlock()
@@ -74,49 +74,64 @@ func (m *OnlineRouteTableMap) Store(key string, value *Router) {
 
 func NewServerTableMap() *ServerTableMap {
 	return &ServerTableMap{
-		internal: make(map[string]*Server),
+		internal: make(map[ServerNameString]*Server),
 	}
 }
 
-func (m *ServerTableMap) Load(key string) (value *Server, ok bool) {
+func (m *ServerTableMap) Load(key ServerNameString) (value *Server, ok bool) {
 	m.RLock()
 	value, ok = m.internal[key]
 	m.RUnlock()
 	return value, ok
 }
 
-func (m *ServerTableMap) Delete(key string) {
+func (m *ServerTableMap) Delete(key ServerNameString) {
 	m.Lock()
 	delete(m.internal, key)
 	m.Unlock()
 }
 
-func (m *ServerTableMap) Store(key string, value *Server) {
+func (m *ServerTableMap) Store(key ServerNameString, value *Server) {
 	m.Lock()
 	m.internal[key] = value
 	m.Unlock()
 }
 
+func (m *ServerTableMap) Range(f func(key ServerNameString, value *Server)) {
+	m.RLock()
+	for k, v := range m.internal {
+		f(k, v)
+	}
+	m.RUnlock()
+}
+
+func (m *ServerTableMap) Len() (length int) {
+	m.RLock()
+	length = len(m.internal)
+	m.RUnlock()
+	return length
+}
+
 func NewServiceTableMap() *ServiceTableMap {
 	return &ServiceTableMap{
-		internal: make(map[*Service]*Router),
+		internal: make(map[ServiceNameString]*Service),
 	}
 }
 
-func (m *ServiceTableMap) Load(key *Service) (value *Router, ok bool) {
+func (m *ServiceTableMap) Load(key ServiceNameString) (value *Service, ok bool) {
 	m.RLock()
 	value, ok = m.internal[key]
 	m.RUnlock()
 	return value, ok
 }
 
-func (m *ServiceTableMap) Delete(key *Service) {
+func (m *ServiceTableMap) Delete(key ServiceNameString) {
 	m.Lock()
 	delete(m.internal, key)
 	m.Unlock()
 }
 
-func (m *ServiceTableMap) Store(key *Service, value *Router) {
+func (m *ServiceTableMap) Store(key ServiceNameString, value *Service) {
 	m.Lock()
 	m.internal[key] = value
 	m.Unlock()
