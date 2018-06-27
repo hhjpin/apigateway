@@ -1,15 +1,13 @@
 package main
 
 import (
+	"api_gateway/core"
 	"api_gateway/utils"
 	"fmt"
 	"github.com/valyala/fasthttp"
-	"api_gateway/core"
 )
 
-var (
-
-)
+var ()
 
 func init() {
 

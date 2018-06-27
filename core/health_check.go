@@ -13,11 +13,10 @@ type HealthCheck struct {
 func CreateHealthCheck(path []byte, timeout uint8, interval uint8, retry bool, retryTime uint8) *HealthCheck {
 
 	return &HealthCheck{
-		path: path,
-		timeout: timeout,
-		interval: interval,
-		retry: retry,
+		path:      path,
+		timeout:   timeout,
+		interval:  interval,
+		retry:     retry,
 		retryTime: retryTime,
 	}
 }
-
