@@ -224,12 +224,24 @@ func (r *RouteTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *BackendA
 			svr:         svr,
 			middleware:  mw,
 		}
-		service, exists := r.serviceTable.Load(svr.nameString)
-		if !exists {
-			r.serviceTable.Store(svr.nameString, svr)
-		} else {
 
+		onlineServer, _ := svr.checkServerStatus(Online)
+		if len(onlineServer) > 0 {
+			rest := r.serverSliceExists(onlineServer)
+			if len(rest) > 0 {
+				for _, i := range rest {
+					_, e:= r.addBackendServer(i)
+					if e != nil {
+						log.SetPrefix("[ERROR]")
+						log.Print("error raised when add server to server-table")
+						return errors.New("error raised when add server to server-table")
+					}
+				}
+			}
+		} else {
+			return errors.New("no server online, can not create router")
 		}
+		r.addBackendService(svr)
 		r.table.Store(fApi.pathString, router)
 		r.routerTable.Store(RouterNameString(router.name), router)
 		return nil
