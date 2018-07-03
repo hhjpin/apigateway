@@ -37,7 +37,7 @@ type ServiceNameString string
 type RouterNameString string
 
 // Routing table struct, should not be copied at any time. Using function `Init()` to create it
-type RouteTable struct {
+type RoutingTable struct {
 	Version string
 
 	// frontend-api/router mapping table
@@ -99,7 +99,7 @@ type Router struct {
 	middleware []*middleware.Middleware
 }
 
-func (r *RouteTable) addBackendService(service *Service) (ok bool, err error) {
+func (r *RoutingTable) addBackendService(service *Service) (ok bool, err error) {
 
 	_, exists := r.serviceTable.Load(service.nameString)
 	if exists {
@@ -111,7 +111,7 @@ func (r *RouteTable) addBackendService(service *Service) (ok bool, err error) {
 	return true, nil
 }
 
-func (r *RouteTable) removeBackendService(service *Service) (ok bool, err error) {
+func (r *RoutingTable) removeBackendService(service *Service) (ok bool, err error) {
 
 	_, exists := r.serviceTable.Load(service.nameString)
 	if !exists {
@@ -123,7 +123,7 @@ func (r *RouteTable) removeBackendService(service *Service) (ok bool, err error)
 	return true, nil
 }
 
-func (r *RouteTable) addBackendServer(server *Server) (ok bool, err error) {
+func (r *RoutingTable) addBackendServer(server *Server) (ok bool, err error) {
 
 	_, exists := r.serverTable.Load(server.nameString)
 	if exists {
@@ -135,7 +135,7 @@ func (r *RouteTable) addBackendServer(server *Server) (ok bool, err error) {
 	return true, nil
 }
 
-func (r *RouteTable) removeBackendServer(server *Server) (ok bool, err error) {
+func (r *RoutingTable) removeBackendServer(server *Server) (ok bool, err error) {
 
 	_, exists := r.serverTable.Load(server.nameString)
 	if !exists {
@@ -147,13 +147,13 @@ func (r *RouteTable) removeBackendServer(server *Server) (ok bool, err error) {
 	return true, nil
 }
 
-func (r *RouteTable) serverExists(server *Server) bool {
+func (r *RoutingTable) serverExists(server *Server) bool {
 	_, exists := r.serverTable.Load(server.nameString)
 	return exists
 }
 
 // check input server exist in the server-table or not, return the rest not-existed server slice
-func (r *RouteTable) serverSliceExists(server []*Server) (rest []*Server) {
+func (r *RoutingTable) serverSliceExists(server []*Server) (rest []*Server) {
 	if len(server) > 0 {
 		for _, s := range server {
 			if !r.serverExists(s) {
@@ -164,7 +164,7 @@ func (r *RouteTable) serverSliceExists(server []*Server) (rest []*Server) {
 	return rest
 }
 
-func (r *RouteTable) CreateBackendApi(path []byte) *BackendApi {
+func (r *RoutingTable) CreateBackendApi(path []byte) *BackendApi {
 	return &BackendApi{
 		path:       path,
 		pathString: BackendApiString(path),
@@ -172,7 +172,7 @@ func (r *RouteTable) CreateBackendApi(path []byte) *BackendApi {
 }
 
 // create frontend api obj, return pointer of api obj. if already exists, return that one
-func (r *RouteTable) CreateFrontendApi(path []byte) (api *FrontendApi, ok bool) {
+func (r *RoutingTable) CreateFrontendApi(path []byte) (api *FrontendApi, ok bool) {
 
 	if router, exists := r.table.Load(FrontendApiString(path)); exists {
 		ok = true
@@ -184,7 +184,7 @@ func (r *RouteTable) CreateFrontendApi(path []byte) (api *FrontendApi, ok bool) 
 	return api, ok
 }
 
-func (r *RouteTable) RemoveFrontendApi(path []byte) (ok bool, err error) {
+func (r *RoutingTable) RemoveFrontendApi(path []byte) (ok bool, err error) {
 	if router, exists := r.table.Load(FrontendApiString(path)); exists {
 		if router.status == Online {
 			// router is online, api can not be deleted
@@ -199,7 +199,7 @@ func (r *RouteTable) RemoveFrontendApi(path []byte) (ok bool, err error) {
 	}
 }
 
-func (r *RouteTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *BackendApi, svr *Service, mw ...*middleware.Middleware) error {
+func (r *RoutingTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *BackendApi, svr *Service, mw ...*middleware.Middleware) error {
 	if fApi.pathString == "" || bApi.pathString == "" {
 		log.SetPrefix("[ERROR]")
 		log.Print("api obj not completed")
@@ -248,11 +248,17 @@ func (r *RouteTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *BackendA
 	}
 }
 
-func (r *RouteTable) GetRouterByName(name []byte) (*Router, error) {
-
+func (r *RoutingTable) GetRouterByName(name []byte) (*Router, error) {
+	router, exists := r.routerTable.Load(RouterNameString(name))
+	if !exists {
+		log.SetPrefix("[WARNING]")
+		log.Print("can not find router by name")
+		return nil, errors.New("can not find router by name")
+	}
+	return router, nil
 }
 
-func (r *RouteTable) RemoveRouter(router *Router) (ok bool, err error) {
+func (r *RoutingTable) RemoveRouter(router *Router) (ok bool, err error) {
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
@@ -271,7 +277,7 @@ func (r *RouteTable) RemoveRouter(router *Router) (ok bool, err error) {
 	return true, nil
 }
 
-func (r *RouteTable) SetRouterOnline(pathString FrontendApiString) (ok bool, err error) {
+func (r *RoutingTable) SetRouterOnline(pathString FrontendApiString) (ok bool, err error) {
 
 	router, exists := r.table.Load(pathString)
 	if !exists {
@@ -317,7 +323,7 @@ func (r *RouteTable) SetRouterOnline(pathString FrontendApiString) (ok bool, err
 	}
 }
 
-func (r *RouteTable) SetRouterStatus(pathString FrontendApiString, status Status) (ok bool, err error) {
+func (r *RoutingTable) SetRouterStatus(pathString FrontendApiString, status Status) (ok bool, err error) {
 	if status == Online {
 		return r.SetRouterOnline(pathString)
 	}
@@ -339,7 +345,7 @@ func (r *RouteTable) SetRouterStatus(pathString FrontendApiString, status Status
 	return true, nil
 }
 
-func (r *RouteTable) CreateService(name []byte, acceptHttpMethod [][]byte) *Service {
+func (r *RoutingTable) CreateService(name []byte, acceptHttpMethod [][]byte) *Service {
 
 	svr, exists := r.serviceTable.Load(ServiceNameString(name))
 	if exists {
@@ -356,7 +362,23 @@ func (r *RouteTable) CreateService(name []byte, acceptHttpMethod [][]byte) *Serv
 	}
 }
 
-func (r *RouteTable) CreateServer(name, host []byte, port uint8, hc *HealthCheck, rate *RateLimit) *Server {
+func (r *RoutingTable) GetServiceByName(name []byte) (*Service, error) {
+
+	service, exists := r.serviceTable.Load(ServiceNameString(name))
+	if !exists {
+		log.SetPrefix("[WARNING]")
+		log.Print("can not find service by name")
+		return nil, errors.New("can not find service by name")
+	}
+	return service, nil
+}
+
+func (r *RoutingTable) RemoveService(srv *Service) error {
+
+	return nil
+}
+
+func (r *RoutingTable) CreateServer(name, host []byte, port uint8, hc *HealthCheck, rate *RateLimit) *Server {
 
 	server, exists := r.serverTable.Load(ServerNameString(name))
 	if exists {
