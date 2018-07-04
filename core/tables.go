@@ -12,9 +12,9 @@ type OnlineApiRouterTableMap struct {
 	internal map[FrontendApiString]*Router
 }
 
-type ServerTableMap struct {
+type EndpointTableMap struct {
 	sync.RWMutex
-	internal map[ServerNameString]*Server
+	internal map[EndpointNameString]*Endpoint
 }
 
 type ServiceTableMap struct {
@@ -52,6 +52,20 @@ func (m *ApiRouterTableMap) Store(key FrontendApiString, value *Router) {
 	m.Unlock()
 }
 
+func (m *ApiRouterTableMap) Range(f func(key FrontendApiString, value *Router)) {
+	m.RLock()
+	for k, v := range m.internal {
+		f(k, v)
+	}
+	m.RUnlock()
+}
+
+func (m *ApiRouterTableMap) unsafeRange(f func(key FrontendApiString, value *Router)) {
+	for k, v := range m.internal {
+		f(k, v)
+	}
+}
+
 func NewOnlineRouteTableMap() *OnlineApiRouterTableMap {
 	return &OnlineApiRouterTableMap{
 		internal: make(map[FrontendApiString]*Router),
@@ -77,32 +91,32 @@ func (m *OnlineApiRouterTableMap) Store(key FrontendApiString, value *Router) {
 	m.Unlock()
 }
 
-func NewServerTableMap() *ServerTableMap {
-	return &ServerTableMap{
-		internal: make(map[ServerNameString]*Server),
+func NewEndpointTableMap() *EndpointTableMap {
+	return &EndpointTableMap{
+		internal: make(map[EndpointNameString]*Endpoint),
 	}
 }
 
-func (m *ServerTableMap) Load(key ServerNameString) (value *Server, ok bool) {
+func (m *EndpointTableMap) Load(key EndpointNameString) (value *Endpoint, ok bool) {
 	m.RLock()
 	value, ok = m.internal[key]
 	m.RUnlock()
 	return value, ok
 }
 
-func (m *ServerTableMap) Delete(key ServerNameString) {
+func (m *EndpointTableMap) Delete(key EndpointNameString) {
 	m.Lock()
 	delete(m.internal, key)
 	m.Unlock()
 }
 
-func (m *ServerTableMap) Store(key ServerNameString, value *Server) {
+func (m *EndpointTableMap) Store(key EndpointNameString, value *Endpoint) {
 	m.Lock()
 	m.internal[key] = value
 	m.Unlock()
 }
 
-func (m *ServerTableMap) Range(f func(key ServerNameString, value *Server)) {
+func (m *EndpointTableMap) Range(f func(key EndpointNameString, value *Endpoint)) {
 	m.RLock()
 	for k, v := range m.internal {
 		f(k, v)
@@ -110,14 +124,14 @@ func (m *ServerTableMap) Range(f func(key ServerNameString, value *Server)) {
 	m.RUnlock()
 }
 
-func (m *ServerTableMap) Len() (length int) {
+func (m *EndpointTableMap) Len() (length int) {
 	m.RLock()
 	length = len(m.internal)
 	m.RUnlock()
 	return length
 }
 
-func (m *ServerTableMap) equal(another *ServerTableMap) (result bool) {
+func (m *EndpointTableMap) equal(another *EndpointTableMap) (result bool) {
 	m.RLock()
 	another.RLock()
 	result = cmpMap(m.internal, another.internal)
@@ -126,7 +140,7 @@ func (m *ServerTableMap) equal(another *ServerTableMap) (result bool) {
 	return result
 }
 
-func cmpMap(m1, m2 map[ServerNameString]*Server) bool {
+func cmpMap(m1, m2 map[EndpointNameString]*Endpoint) bool {
 	for k1, v1 := range m1 {
 		if v2, has := m2[k1]; has {
 			if v1.equal(v2) {
