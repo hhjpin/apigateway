@@ -199,6 +199,10 @@ func (r *RoutingTable) RemoveFrontendApi(path []byte) (ok bool, err error) {
 	}
 }
 
+func (r *RoutingTable) CheckRouterStatus() ([]*Router, error) {
+	
+}
+
 func (r *RoutingTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *BackendApi, svr *Service, mw ...*middleware.Middleware) error {
 	if fApi.pathString == "" || bApi.pathString == "" {
 		log.SetPrefix("[ERROR]")
@@ -277,16 +281,16 @@ func (r *RoutingTable) RemoveRouter(router *Router) (ok bool, err error) {
 	return true, nil
 }
 
-func (r *RoutingTable) SetRouterOnline(pathString FrontendApiString) (ok bool, err error) {
+func (r *RoutingTable) SetRouterOnline(router *Router) (ok bool, err error) {
 
-	router, exists := r.table.Load(pathString)
+	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
 		log.SetPrefix("[WARNING]")
 		log.Print("router not exists")
 		return false, errors.New(25)
 	}
 
-	onlineRouter, exists := r.onlineTable.Load(pathString)
+	onlineRouter, exists := r.onlineTable.Load(router.frontendApi.pathString)
 	if !exists {
 		// not exist in online table
 		// check backend endpoint status first
@@ -308,8 +312,8 @@ func (r *RoutingTable) SetRouterOnline(pathString FrontendApiString) (ok bool, e
 					}
 				}
 			}
-			router.SetOnline()
-			r.onlineTable.Store(pathString, router)
+			router.setStatus(Online)
+			r.onlineTable.Store(router.frontendApi.pathString, router)
 			return true, nil
 		}
 	} else {
@@ -323,23 +327,23 @@ func (r *RoutingTable) SetRouterOnline(pathString FrontendApiString) (ok bool, e
 	}
 }
 
-func (r *RoutingTable) SetRouterStatus(pathString FrontendApiString, status Status) (ok bool, err error) {
+func (r *RoutingTable) SetRouterStatus(router *Router, status Status) (ok bool, err error) {
 	if status == Online {
-		return r.SetRouterOnline(pathString)
+		return r.SetRouterOnline(router)
 	}
 
-	router, exists := r.table.Load(pathString)
+	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
 		log.SetPrefix("[WARNING]")
 		log.Print("router not exists")
 		return false, errors.New(25)
 	}
 
-	_, exists = r.onlineTable.Load(pathString)
+	_, exists = r.onlineTable.Load(router.frontendApi.pathString)
 	if !exists {
 		// not exist in online table, do nothing
 	} else {
-		r.onlineTable.Delete(pathString)
+		r.onlineTable.Delete(router.frontendApi.pathString)
 	}
 	router.setStatus(status)
 	return true, nil
@@ -424,6 +428,29 @@ func (r *RoutingTable) CreateEndpoint(name, host []byte, port uint8, hc *HealthC
 	}
 }
 
+func (r *RoutingTable) GetEndpointByName(name EndpointNameString) (*Endpoint, error) {
+
+	endpoint, exists := r.endpointTable.Load(name)
+	if exists {
+		return endpoint, nil
+	} else {
+		log.SetPrefix("[WARNING]")
+		log.Print("can not find endpoint by name")
+		return nil, errors.New(39)
+	}
+}
+
+func (r *RoutingTable) SetEndpointOnline(ep *Endpoint) error {
+	_, exists := r.endpointTable.Load(ep.nameString)
+	if !exists {
+		log.SetPrefix("[WARNING]")
+		log.Print("endpoint not exists")
+		return errors.New(39)
+	}
+	ep.setStatus(Online)
+	return nil
+}
+
 func (r *RoutingTable) RemoveEndpoint(svr *Endpoint) error {
 
 	_, exists := r.endpointTable.Load(svr.nameString)
@@ -432,6 +459,20 @@ func (r *RoutingTable) RemoveEndpoint(svr *Endpoint) error {
 		log.Print("can not find endpoint by name")
 		return errors.New(39)
 	}
+
+	r.serviceTable.Lock()
+	r.serviceTable.unsafeRange(func(key ServiceNameString, value *Service) {
+		value.ep.Lock()
+		value.ep.unsafeRange(func(k EndpointNameString, v *Endpoint) {
+			if v == svr {
+				value.ep.Delete(svr.nameString)
+			}
+		})
+		value.ep.Unlock()
+	})
+	r.serviceTable.Unlock()
+
+	r.endpointTable.Delete(svr.nameString)
 	return nil
 }
 
@@ -453,18 +494,6 @@ func (a *BackendApi) equal(another *BackendApi) bool {
 
 func (r *Router) setStatus(status Status) {
 	r.status = status
-}
-
-func (r *Router) SetOnline() {
-	r.setStatus(Online)
-}
-
-func (r *Router) SetOffline() {
-	r.setStatus(Offline)
-}
-
-func (r *Router) BreakDown() {
-	r.setStatus(BreakDown)
 }
 
 func cmpPointerSlice(a, b []*middleware.Middleware) bool {
@@ -511,11 +540,15 @@ func (s *Service) checkEndpointStatus(must Status) (confirm []*Endpoint, rest []
 	return confirm, rest
 }
 
-func (s *Endpoint) equal(another *Endpoint) bool {
-	if bytes.Equal(s.name, another.name) && s.nameString == another.nameString && s.status == another.status &&
-		bytes.Equal(s.host, another.host) && s.port == another.port {
+func (ep *Endpoint) equal(another *Endpoint) bool {
+	if bytes.Equal(ep.name, another.name) && ep.nameString == another.nameString && ep.status == another.status &&
+		bytes.Equal(ep.host, another.host) && ep.port == another.port {
 		return true
 	} else {
 		return false
 	}
+}
+
+func (ep *Endpoint) setStatus(status Status) {
+	ep.status = status
 }

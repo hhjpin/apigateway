@@ -91,6 +91,14 @@ func (m *OnlineApiRouterTableMap) Store(key FrontendApiString, value *Router) {
 	m.Unlock()
 }
 
+func (m *OnlineApiRouterTableMap) Range(f func(key FrontendApiString, value *Router)) {
+	m.RLock()
+	for k, v := range m.internal {
+		f(k, v)
+	}
+	m.RUnlock()
+}
+
 func NewEndpointTableMap() *EndpointTableMap {
 	return &EndpointTableMap{
 		internal: make(map[EndpointNameString]*Endpoint),
@@ -122,6 +130,12 @@ func (m *EndpointTableMap) Range(f func(key EndpointNameString, value *Endpoint)
 		f(k, v)
 	}
 	m.RUnlock()
+}
+
+func (m *EndpointTableMap) unsafeRange(f func(key EndpointNameString, value *Endpoint)) {
+	for k, v := range m.internal {
+		f(k, v)
+	}
 }
 
 func (m *EndpointTableMap) Len() (length int) {
@@ -185,6 +199,12 @@ func (m *ServiceTableMap) Store(key ServiceNameString, value *Service) {
 	m.Lock()
 	m.internal[key] = value
 	m.Unlock()
+}
+
+func (m *ServiceTableMap) unsafeRange(f func(key ServiceNameString, value *Service)) {
+	for k, v := range m.internal {
+		f(k, v)
+	}
 }
 
 func NewRouteTableMap() *RouterTableMap {
