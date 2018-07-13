@@ -34,6 +34,7 @@ type Config struct {
 	} `yaml:"Client"`
 
 	Etcd struct {
+		Name      string   `yaml:"Name"`
 		Endpoints []string `yaml:"Endpoints"`
 		Username  string   `yaml:"Username"`
 		Password  string   `yaml:"Password"`

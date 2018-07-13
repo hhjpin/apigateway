@@ -32,6 +32,7 @@ Server:
 
 # Etcd config
 Etcd:
+  name: "etcd-00"
 
   # Endpoint is a list of URLs
   Endpoints: []

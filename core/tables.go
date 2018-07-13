@@ -1,6 +1,8 @@
 package core
 
-import "sync"
+import (
+	"sync"
+)
 
 type ApiRouterTableMap struct {
 	sync.RWMutex
@@ -9,7 +11,7 @@ type ApiRouterTableMap struct {
 
 type OnlineApiRouterTableMap struct {
 	sync.RWMutex
-	internal map[FrontendApiString]*Router
+	internal map[*FrontendApi]*Router
 }
 
 type EndpointTableMap struct {
@@ -68,33 +70,36 @@ func (m *ApiRouterTableMap) unsafeRange(f func(key FrontendApiString, value *Rou
 
 func NewOnlineRouteTableMap() *OnlineApiRouterTableMap {
 	return &OnlineApiRouterTableMap{
-		internal: make(map[FrontendApiString]*Router),
+		internal: make(map[*FrontendApi]*Router),
 	}
 }
 
-func (m *OnlineApiRouterTableMap) Load(key FrontendApiString) (value *Router, ok bool) {
+func (m *OnlineApiRouterTableMap) Load(key *FrontendApi) (value *Router, ok bool) {
 	m.RLock()
 	value, ok = m.internal[key]
 	m.RUnlock()
 	return value, ok
 }
 
-func (m *OnlineApiRouterTableMap) Delete(key FrontendApiString) {
+func (m *OnlineApiRouterTableMap) Delete(key *FrontendApi) {
 	m.Lock()
 	delete(m.internal, key)
 	m.Unlock()
 }
 
-func (m *OnlineApiRouterTableMap) Store(key FrontendApiString, value *Router) {
+func (m *OnlineApiRouterTableMap) Store(key *FrontendApi, value *Router) {
 	m.Lock()
 	m.internal[key] = value
 	m.Unlock()
 }
 
-func (m *OnlineApiRouterTableMap) Range(f func(key FrontendApiString, value *Router)) {
+func (m *OnlineApiRouterTableMap) Range(f func(key *FrontendApi, value *Router) bool) {
 	m.RLock()
 	for k, v := range m.internal {
-		f(k, v)
+		ret := f(k, v)
+		if ret {
+			break
+		}
 	}
 	m.RUnlock()
 }

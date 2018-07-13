@@ -1,8 +1,8 @@
 package errors
 
 import (
-	"log"
 	"fmt"
+	"log"
 )
 
 const (
@@ -43,14 +43,14 @@ func New(errCode int, errMsg ...CustomErrMsg) Error {
 				tmpErrMsgEn = BaseErrors[errCode].ErrMsgEn
 			}
 			return Error{
-				ErrCode: errCode,
-				ErrMsg: tmpErrMsg,
+				ErrCode:  errCode,
+				ErrMsg:   tmpErrMsg,
 				ErrMsgEn: tmpErrMsgEn,
 			}
 		} else {
 			return Error{
-				ErrCode: errCode,
-				ErrMsg: BaseErrors[errCode].ErrMsg,
+				ErrCode:  errCode,
+				ErrMsg:   BaseErrors[errCode].ErrMsg,
 				ErrMsgEn: BaseErrors[errCode].ErrMsgEn,
 			}
 		}
@@ -59,8 +59,8 @@ func New(errCode int, errMsg ...CustomErrMsg) Error {
 			log.SetPrefix("[WARNING]")
 			log.Print("lack of err msg info when defining cumstom error")
 			return Error{
-				ErrCode: errCode,
-				ErrMsg: "未知错误",
+				ErrCode:  errCode,
+				ErrMsg:   "未知错误",
 				ErrMsgEn: "unknown error",
 			}
 		}
@@ -68,14 +68,14 @@ func New(errCode int, errMsg ...CustomErrMsg) Error {
 			log.SetPrefix("[WARNING]")
 			log.Print("lack of err msg info when defining cumstom error")
 			return Error{
-				ErrCode: errCode,
-				ErrMsg: "未知错误",
+				ErrCode:  errCode,
+				ErrMsg:   "未知错误",
 				ErrMsgEn: "unknown error",
 			}
 		}
 		return Error{
-			ErrCode: errCode,
-			ErrMsg: errMsg[0].ErrMsg,
+			ErrCode:  errCode,
+			ErrMsg:   errMsg[0].ErrMsg,
 			ErrMsgEn: errMsg[0].ErrMsgEn,
 		}
 	}

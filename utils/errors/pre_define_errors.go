@@ -1,7 +1,7 @@
 package errors
 
 type BaseErrMsg struct {
-	ErrMsg string `json:"err_msg"`
+	ErrMsg   string `json:"err_msg"`
 	ErrMsgEn string `json:"err_msg_en"`
 }
 
@@ -16,6 +16,7 @@ func init() {
 	BaseErrors[3] = BaseErrMsg{ErrMsg: "权限不足", ErrMsgEn: "permission denied"}
 	BaseErrors[4] = BaseErrMsg{ErrMsg: "服务维护中, 请稍后", ErrMsgEn: "service maintaining, please wait"}
 	BaseErrors[5] = BaseErrMsg{ErrMsg: "访问量过大, 请稍后重试", ErrMsgEn: "router under flow control"}
+	BaseErrors[6] = BaseErrMsg{ErrMsg: "请求的服务不存在", ErrMsgEn: "service not found"}
 
 	// router operating error
 	BaseErrors[20] = BaseErrMsg{ErrMsg: "服务已存在", ErrMsgEn: "service already exists"}
@@ -40,4 +41,9 @@ func init() {
 	BaseErrors[37] = BaseErrMsg{ErrMsg: "无法找到服务", ErrMsgEn: "can not find service by name"}
 	BaseErrors[38] = BaseErrMsg{ErrMsg: "服务链接到某个已存在的路由规则, 无法被移除", ErrMsgEn: "service is linked to an online router, can not be removed"}
 	BaseErrors[39] = BaseErrMsg{ErrMsg: "无法找到终端服务", ErrMsgEn: "can not find endpoint by name"}
+	BaseErrors[40] = BaseErrMsg{ErrMsg: "轮询终端服务队列时发生异常: 节点数据错误", ErrMsgEn: "the Ring of endpoints contains an invalid value"}
+	BaseErrors[41] = BaseErrMsg{ErrMsg: "轮询终端服务队列时发生异常: 无一节点在线", ErrMsgEn: "all node of rings is not online"}
+
+	BaseErrors[42] = BaseErrMsg{ErrMsg: "外层API不存在", ErrMsgEn: "frontend api not found"}
+	BaseErrors[43] = BaseErrMsg{ErrMsg: "路由规则不在线", ErrMsgEn: "router is not online"}
 }
