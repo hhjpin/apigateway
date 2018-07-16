@@ -17,6 +17,7 @@ func init() {
 	BaseErrors[4] = BaseErrMsg{ErrMsg: "服务维护中, 请稍后", ErrMsgEn: "service maintaining, please wait"}
 	BaseErrors[5] = BaseErrMsg{ErrMsg: "访问量过大, 请稍后重试", ErrMsgEn: "router under flow control"}
 	BaseErrors[6] = BaseErrMsg{ErrMsg: "请求的服务不存在", ErrMsgEn: "service not found"}
+	BaseErrors[7] = BaseErrMsg{ErrMsg: "路由无效", ErrMsgEn: "routing table not exists"}
 
 	// router operating error
 	BaseErrors[20] = BaseErrMsg{ErrMsg: "服务已存在", ErrMsgEn: "service already exists"}
@@ -46,4 +47,8 @@ func init() {
 
 	BaseErrors[42] = BaseErrMsg{ErrMsg: "外层API不存在", ErrMsgEn: "frontend api not found"}
 	BaseErrors[43] = BaseErrMsg{ErrMsg: "路由规则不在线", ErrMsgEn: "router is not online"}
+}
+
+func (e BaseErrMsg) String() string {
+
 }

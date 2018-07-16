@@ -3,10 +3,11 @@ package errors
 import (
 	"fmt"
 	"log"
+	"encoding/json"
 )
 
 const (
-	errorStringFormat = "ErrCode: {%d}, ErrMsg: {%s}, ErrMsgEn: {%s}"
+	errorStringFormat = "ErrCode [%d]\nErrMsg: %s\nErrMsgEn: %s"
 )
 
 // Error holds the error message, this message never really changes
@@ -83,4 +84,13 @@ func New(errCode int, errMsg ...CustomErrMsg) Error {
 
 func (e Error) Error() string {
 	return fmt.Sprintf(errorStringFormat, e.ErrCode, e.ErrMsg, e.ErrMsgEn)
+}
+
+func (e Error) Marshal() []byte {
+	j, _ := json.Marshal(e)
+	return j
+}
+
+func (e Error) MarshalString() string {
+	return string(e.Marshal())
 }

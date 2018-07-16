@@ -7,17 +7,19 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-var ()
+var (
+	table *core.RoutingTable
+)
 
 func init() {
-
+	table = core.InitRoutingTable()
 }
 
 func main() {
 	var server *fasthttp.Server
 
 	server = &fasthttp.Server{
-		Handler: core.MainRequestHandler,
+		Handler: core.MainRequestHandlerWrapper(table),
 
 		Name:               utils.Conf.Server.Name,
 		Concurrency:        utils.Conf.Server.Concurrency,
