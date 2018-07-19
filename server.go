@@ -5,6 +5,7 @@ import (
 	"api_gateway/utils"
 	"fmt"
 	"github.com/valyala/fasthttp"
+	"log"
 )
 
 var (
@@ -30,5 +31,10 @@ func main() {
 		MaxRequestBodySize: utils.Conf.Server.MaxRequestBodySize,
 	}
 
-	server.ListenAndServe(fmt.Sprintf("%s:%d", utils.Conf.Server.ListenHost, utils.Conf.Server.ListenPort))
+	host := fmt.Sprintf("%s:%d", utils.Conf.Server.ListenHost, utils.Conf.Server.ListenPort)
+	log.Print(host)
+	err := server.ListenAndServe(host)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

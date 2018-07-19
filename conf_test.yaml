@@ -3,7 +3,7 @@ Server:
 
   Name: "Api Gateway"
   ListenHost: "0.0.0.0"
-  ListenPort: 80
+  ListenPort: 8800
   ListenDomainName: []
 
   # entries below will influence server performance, should be keep on default value

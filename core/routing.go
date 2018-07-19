@@ -83,7 +83,7 @@ type Endpoint struct {
 	status Status // 0 -> offline, 1 -> online, 2 -> breakdown
 
 	healthCheck *HealthCheck
-	rate        *RateLimit
+	rate        *TokenBucketRateLimit
 }
 
 // Service-struct defined a backend-service
@@ -425,7 +425,7 @@ func (r *RoutingTable) RemoveService(svr *Service) error {
 	return err
 }
 
-func (r *RoutingTable) CreateEndpoint(name, host []byte, port uint8, hc *HealthCheck, rate *RateLimit) *Endpoint {
+func (r *RoutingTable) CreateEndpoint(name, host []byte, port uint8, hc *HealthCheck, rate *TokenBucketRateLimit) *Endpoint {
 
 	endpoint, exists := r.endpointTable.Load(EndpointNameString(name))
 	if exists {

@@ -48,7 +48,3 @@ func init() {
 	BaseErrors[42] = BaseErrMsg{ErrMsg: "外层API不存在", ErrMsgEn: "frontend api not found"}
 	BaseErrors[43] = BaseErrMsg{ErrMsg: "路由规则不在线", ErrMsgEn: "router is not online"}
 }
-
-func (e BaseErrMsg) String() string {
-
-}

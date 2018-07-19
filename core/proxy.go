@@ -5,12 +5,14 @@ import (
 	"time"
 	"api_gateway/utils/errors"
 	"bytes"
+	"api_gateway/middleware"
 )
 
-func MainRequestHandlerWrapper(table *RoutingTable) fasthttp.RequestHandler {
+func MainRequestHandlerWrapper(table *RoutingTable, middle ...*middleware.Middleware) fasthttp.RequestHandler {
 	return fasthttp.TimeoutHandler(
 		func(ctx *fasthttp.RequestCtx) {
 			ctx.SetUserValue("RoutingTable", table)
+			ctx.SetUserValue("Middleware", middle)
 			ReverseProxyHandler(ctx)
 	},
 	time.Second * 5,
