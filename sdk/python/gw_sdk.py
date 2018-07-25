@@ -8,30 +8,6 @@ import simplejson as json
 
 from .const import *
 
-"""
-register config ex:
-    {
-        "service": "",
-        "server": {
-            "name": "",
-            "health_check": {
-                "path": "/check",
-                "timeout": 0,        
-                "interval": 0,      
-                "retry": 0,         
-                "retry_time": 0
-            }
-        },
-        "router": [
-            {
-                "name": "",
-                "outer_api": "/api/v1/ds/cart",
-                "inner_api": "/v1/cart",
-            }
-        ]
-    }
-"""
-
 
 class ClientNotExist(Exception):
     pass
@@ -164,8 +140,6 @@ class EtcdConf(object):
 
     def __str__(self):
         return "HOST: {}, PORT: {}, USER: {}, PASSWORD: {}".format(self.host, str(self.port), self.user, self.password)
-
-# class PendingRouter(object):
 
 
 class ApiGatewayRegistrant(object):
