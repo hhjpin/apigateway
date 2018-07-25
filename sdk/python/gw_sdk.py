@@ -203,6 +203,11 @@ class ApiGatewayRegistrant(object):
         if self._client is None:
             raise ClientNotExist
 
+        self._register_node()
+        self._register_service()
+        self._register_router()
+        self._register_hc()
+
     def _register_node(self):
         if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):
             raise ClientNotExist
@@ -258,3 +263,49 @@ class ApiGatewayRegistrant(object):
             # service not exits, put new one
             put(c, s.id, s.id)
             put(c, s.id, s.name)
+
+    def _register_router(self):
+        if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):
+            raise ClientNotExist
+
+        c = self._client
+        rl = self._router
+
+        def put(cli, router_id, attr):
+            cli.put(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + router_id, attr.name]), attr.bytes)
+
+        for r in rl:
+            v = c.get(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + r.id, r.id.name]))
+            if r.id == v:
+                # router exists, update
+                pass
+            else:
+                put(c, r.id, r.id)
+
+            put(c, r.id, r.name)
+            put(c, r.id, r.service)
+            put(c, r.id, r.frontend)
+            put(c, r.id, r.backend)
+
+    def _register_hc(self):
+        if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):
+            raise ClientNotExist
+
+        c = self._client
+        hc = self._hc
+
+        def put(cli, hc_id, attr):
+            cli.put(ROOT + SLASH.join([HEALTH_CHECK_KEY, HEALTH_CHECK_PREFIX + hc_id, attr.name]), attr.bytes)
+
+        v = c.get(ROOT + SLASH.join([HEALTH_CHECK_KEY, HEALTH_CHECK_PREFIX + hc.id, hc.id.name]))
+        if hc.id == v:
+            # health check exists, update
+            pass
+        else:
+            put(c, hc.id, hc.id)
+
+        put(c, hc.id, hc.path)
+        put(c, hc.id, hc.interval)
+        put(c, hc.id, hc.timeout)
+        put(c, hc.id, hc.retry)
+        put(c, hc.id, hc.retry_time)
