@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+ROOT = "/"
+SLASH = "/"
 NODE_KEY = "Node"
 NODE_PREFIX = "Node-"
 SERVICE_KEY = "Service"

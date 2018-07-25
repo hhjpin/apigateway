@@ -4,6 +4,7 @@
 import uuid
 import etcd3
 import logging
+import simplejson as json
 
 from .const import *
 
@@ -56,35 +57,103 @@ class GatewayDefinition(object):
             raise NotDefinedAttributeError
 
 
+class Tag(object):
+
+    @property
+    def name(self):
+        if hasattr(self, "_tag"):
+            return self._tag
+        else:
+            return ""
+
+    @property
+    def bytes(self):
+        if hasattr(self, "value"):
+            return bytes(self.value)
+        else:
+            return bytes()
+
+
+class String(str, Tag):
+
+    def __init__(self, tag: str):
+        super(String, self).__init__()
+        self._tag = tag
+
+    @property
+    def value(self):
+        return self.__str__()
+
+
+class Slice(list, Tag):
+
+    def __init__(self, tag: str):
+        super(Slice, self).__init__()
+        self._tag = tag
+
+    @property
+    def value(self):
+        new = list()
+        for i in self:
+            new.append(i)
+        return new
+
+    @property
+    def bytes(self):
+        return bytes(json.dumps(self.value))
+
+
+class Integer(int, Tag):
+
+    def __init__(self, tag: str):
+        super(Integer, self).__init__()
+        self._tag = tag
+
+    @property
+    def value(self):
+        return self
+
+
+class Boolean(bool, Tag):
+
+    def __init__(self, tag: str):
+        super(Boolean, self).__init__()
+        self._tag = tag
+
+    @property
+    def bytes(self):
+        return bytes(1) if self is True else bytes(0)
+
+
 class ServiceDefinition(GatewayDefinition):
-    id: str
-    name: str
-    node: list
+    id = String("ID")
+    name = String("Name")
+    node = Slice("Node")
 
 
 class HealthCheckDefinition(GatewayDefinition):
-    id: str
-    path: str
-    timeout: int
-    interval: int
-    retry: bool
-    retry_time: int
+    id = String("ID")
+    path = String("Path")
+    timeout = Integer("Timeout")
+    interval = Integer("Interval")
+    retry = Boolean("Retry")
+    retry_time = Integer("RetryTime")
 
 
 class NodeDefinition(GatewayDefinition):
-    id: str
-    name: str
-    status: int
-    health_check: str
-    service: str
+    id = String("ID")
+    name = String("Name")
+    status = Integer("Status")
+    health_check = String("HealthCheck")
+    service = String("Service")
 
 
 class RouterDefinition(GatewayDefinition):
-    id: str
-    name: str
-    frontend: str
-    backend: str
-    service: str
+    id = String("ID")
+    name = String("Name")
+    frontend = String("FrontendApi")
+    backend = String("BackendApi")
+    service = String("Service")
 
 
 class EtcdConf(object):
@@ -138,4 +207,54 @@ class ApiGatewayRegistrant(object):
         if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):
             raise ClientNotExist
 
-        self._client.get("")
+        n = self._node
+        c = self._client
+
+        def put(cli, node_id, attr):
+            cli.put(ROOT + SLASH.join([NODE_KEY, NODE_PREFIX + node_id, attr.name]), attr.bytes)
+
+        v = c.get(ROOT + SLASH.join([NODE_KEY, NODE_PREFIX + n.id, n.id.name]))
+        if n.id == v:
+            # node exists, update node
+            pass
+        else:
+            # node not exists, put new one
+            put(c, n.id, n.id)
+        put(c, n.id, n.name)
+        put(c, n.id, n.status)
+        put(c, n.id, n.health_check)
+        put(c, n.id, n.service)
+
+    def _register_service(self):
+        if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):
+            raise ClientNotExist
+
+        s = self._service
+        c = self._client
+
+        def put(cli, service_id, attr):
+            cli.put(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + service_id, attr.name]), attr.bytes)
+
+        v = c.get(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.id, s.id.name]))
+        if s.id == v:
+            # service exists, check node exists in service.node_slice
+            node_slice_json = c.get(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.id, s.node.name]))
+            try:
+                node_slice = json.loads(node_slice_json)
+            except Exception as e:
+                logging.exception(e)
+                node_slice = list()
+
+            flag = 0
+            for n in node_slice:
+                if n == self._node.id:
+                    flag = 1
+                    break
+            if flag == 0 and len(node_slice) > 0:
+                node_slice.append(self._node.id)
+                c.put(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.id, s.node.name]),
+                      bytes(json.dumps(node_slice)))
+        else:
+            # service not exits, put new one
+            put(c, s.id, s.id)
+            put(c, s.id, s.name)
