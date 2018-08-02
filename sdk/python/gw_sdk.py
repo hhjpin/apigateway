@@ -102,7 +102,6 @@ class Boolean(bool, Tag):
 
 
 class ServiceDefinition(GatewayDefinition):
-    id = String("ID")
     name = String("Name")
     node = Slice("Node")
 
@@ -211,13 +210,13 @@ class ApiGatewayRegistrant(object):
         s = self._service
         c = self._client
 
-        def put(cli, service_id, attr):
-            cli.put(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + service_id, attr.name]), attr.bytes)
+        def put(cli, service_name, attr):
+            cli.put(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + service_name, attr.name]), attr.bytes)
 
-        v = c.get(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.id, s.id.name]))
-        if s.id == v:
+        v = c.get(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.name, s.name.name]))
+        if s.name == v:
             # service exists, check node exists in service.node_slice
-            node_slice_json = c.get(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.id, s.node.name]))
+            node_slice_json = c.get(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.name, s.node.name]))
             try:
                 node_slice = json.loads(node_slice_json)
             except Exception as e:
@@ -231,12 +230,11 @@ class ApiGatewayRegistrant(object):
                     break
             if flag == 0 and len(node_slice) > 0:
                 node_slice.append(self._node.id)
-                c.put(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.id, s.node.name]),
+                c.put(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.name, s.node.name]),
                       bytes(json.dumps(node_slice)))
         else:
             # service not exits, put new one
-            put(c, s.id, s.id)
-            put(c, s.id, s.name)
+            put(c, s.name, s.name)
 
     def _register_router(self):
         if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):

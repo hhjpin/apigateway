@@ -670,8 +670,3 @@ func match(input, pattern [][]byte) (bool, []byte) {
 		return false, nil
 	}
 }
-
-func InitRoutingTable() *RoutingTable {
-
-	return nil
-}
