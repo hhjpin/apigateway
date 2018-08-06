@@ -111,16 +111,17 @@ class HealthCheckDefinition(GatewayDefinition):
     path = String("Path")
     timeout = Integer("Timeout")
     interval = Integer("Interval")
-    retry = Boolean("Retry")
+    retry = Integer("Retry")
     retry_time = Integer("RetryTime")
 
 
 class NodeDefinition(GatewayDefinition):
     id = String("ID")
     name = String("Name")
+    host = String("Host")
+    port = Integer("Port")
     status = Integer("Status")
     health_check = String("HealthCheck")
-    service = String("Service")
 
 
 class RouterDefinition(GatewayDefinition):
@@ -153,6 +154,7 @@ class ApiGatewayRegistrant(object):
         node.id = uid
         node.name += uid
         node.status = 0
+        node.health_check = uid
         service.id = uid
         service.name += uid
         self._hc = hc
@@ -199,9 +201,10 @@ class ApiGatewayRegistrant(object):
             # node not exists, put new one
             put(c, n.id, n.id)
         put(c, n.id, n.name)
+        put(c, n.id, n.host)
+        put(c, n.id, n.port)
         put(c, n.id, n.status)
         put(c, n.id, n.health_check)
-        put(c, n.id, n.service)
 
     def _register_service(self):
         if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):

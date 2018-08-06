@@ -47,4 +47,7 @@ func init() {
 
 	BaseErrors[42] = BaseErrMsg{ErrMsg: "外层API不存在", ErrMsgEn: "frontend api not found"}
 	BaseErrors[43] = BaseErrMsg{ErrMsg: "路由规则不在线", ErrMsgEn: "router is not online"}
+
+	BaseErrors[50] = BaseErrMsg{ErrMsg: "不正确的状态数值", ErrMsgEn: "invalid status code"}
+	BaseErrors[51] = BaseErrMsg{ErrMsg: "终端节点属性值不全", ErrMsgEn: "uncompleted attribute assigned"}
 }
