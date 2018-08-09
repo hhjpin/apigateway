@@ -2,70 +2,47 @@ package core
 
 import (
 	"api_gateway/utils"
+	"api_gateway/utils/errors"
 	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/coreos/etcd/clientv3"
 	"log"
+	"strconv"
 	"sync"
 	"time"
-	"strconv"
-	"api_gateway/utils/errors"
-	"encoding/json"
 )
 
 const (
-	Root              = "/"
-	Slash             = "/"
-	NodeKey           = "Node"
-	NodePrefix        = "Node-"
-	ServiceKey        = "Service"
-	ServicePrefix     = "Service-"
-	RouterKey         = "Router"
-	RouterPrefix      = "Router-"
-	HealthCheckKey    = "HealthCheck"
-	HealthCheckPrefix = "HC-"
-	IdKey             = "ID"
-	NameKey           = "Name"
-	PathKey           = "Path"
-	TimeoutKey        = "Timeout"
-	IntervalKey       = "Interval"
-	RetryKey          = "Retry"
-	RetryTimeKey      = "RetryTime"
-
-	RouterDefinition = "/Router/"
-	ServiceDefinition = "/Service/"
-	NodePrefixDefinition = "/Node/Node-"
+	Root                        = "/"
+	Slash                       = "/"
+	RouterDefinition            = "/Router/"
+	ServiceDefinition           = "/Service/"
+	NodePrefixDefinition        = "/Node/Node-"
 	HealthCheckPrefixDefinition = "/HealthCheck/HC-"
 )
 
 var (
-	RootBytes              = []byte("/")
 	SlashBytes             = []byte("/")
 	NodeKeyBytes           = []byte("Node")
-	NodePrefixBytes        = []byte("Node-")
 	ServiceKeyBytes        = []byte("Service")
 	ServicePrefixBytes     = []byte("Service-")
-	RouterKeyBytes         = []byte("Router")
 	RouterPrefixBytes      = []byte("Router-")
 	HealthCheckKeyBytes    = []byte("HealthCheck")
-	HealthCheckPrefixBytes = []byte("HC-")
 	IdKeyBytes             = []byte("ID")
 	NameKeyBytes           = []byte("Name")
-	HostKeyBytes = []byte("Host")
-	PortKeyBytes = []byte("Port")
-	StatusKeyBytes = []byte("Status")
-	FrontendApiKeyBytes = []byte("FrontendApi")
-	BackendApiKeyBytes = []byte("BackendApi")
+	HostKeyBytes           = []byte("Host")
+	PortKeyBytes           = []byte("Port")
+	StatusKeyBytes         = []byte("Status")
+	FrontendApiKeyBytes    = []byte("FrontendApi")
+	BackendApiKeyBytes     = []byte("BackendApi")
 	PathKeyBytes           = []byte("Path")
 	TimeoutKeyBytes        = []byte("Timeout")
 	IntervalKeyBytes       = []byte("Interval")
 	RetryKeyBytes          = []byte("Retry")
 	RetryTimeKeyBytes      = []byte("RetryTime")
-
-	RouterDefinitionBytes = []byte("/Router/")
-	NodeDefinitionBytes = []byte("/Node/")
+	RouterDefinitionBytes  = []byte("/Router/")
 	ServiceDefinitionBytes = []byte("/Service/")
-
 )
 
 type etcdPool struct {
@@ -150,7 +127,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 				if bytes.Equal(tmp[1], NameKeyBytes) {
 					s.name = kv.Value
 					s.nameString = ServiceNameString(kv.Value)
-				} else if bytes.Equal(tmp[1], NodeKeyBytes){
+				} else if bytes.Equal(tmp[1], NodeKeyBytes) {
 					// check node
 					var nodeSlice []string
 
@@ -180,10 +157,10 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 				if bytes.Equal(tmp[1], NameKeyBytes) {
 					if bytes.Equal(kv.Value, sName) {
 						s = &Service{
-							name: sName,
+							name:       sName,
 							nameString: ServiceNameString(sName),
-							ep: nil,
-							onlineEp: nil,
+							ep:         nil,
+							onlineEp:   nil,
 						}
 						svrMap.Store(ServiceNameString(sName), s)
 					} else {
@@ -194,10 +171,10 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 					var epSlice EndpointTableMap
 
 					s = &Service{
-						name: sName,
+						name:       sName,
 						nameString: ServiceNameString(sName),
-						ep: nil,
-						onlineEp: nil,
+						ep:         nil,
+						onlineEp:   nil,
 					}
 					err = json.Unmarshal(kv.Value, &nodeSlice)
 					if err != nil {
@@ -231,14 +208,14 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 	var ep Endpoint
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	resp, err := cli.Get(ctx, NodePrefixDefinition + nodeID, clientv3.WithPrefix())
+	resp, err := cli.Get(ctx, NodePrefixDefinition+nodeID, clientv3.WithPrefix())
 	cancel()
 	if err != nil {
 		log.Print(err)
 		return nil, err
 	}
 	for _, kv := range resp.Kvs {
-		key := bytes.TrimPrefix(kv.Key, []byte(NodePrefixDefinition + nodeID + Slash))
+		key := bytes.TrimPrefix(kv.Key, []byte(NodePrefixDefinition+nodeID+Slash))
 		if bytes.Equal(key, IdKeyBytes) {
 			// do nothing
 		} else if bytes.Equal(key, NameKeyBytes) {
@@ -272,7 +249,7 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 		} else if bytes.Equal(key, HealthCheckKeyBytes) {
 			// get health check info
 			ctxA, cancelA := context.WithTimeout(context.Background(), 1*time.Second)
-			respA, err := cli.Get(ctxA, HealthCheckPrefixDefinition + string(kv.Value), clientv3.WithPrefix())
+			respA, err := cli.Get(ctxA, HealthCheckPrefixDefinition+string(kv.Value), clientv3.WithPrefix())
 			cancelA()
 			if err != nil {
 				log.Print(err)
@@ -281,27 +258,27 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 
 			var hc HealthCheck
 			for _, kvA := range respA.Kvs {
-				keyA := bytes.TrimPrefix(kvA.Key, []byte(HealthCheckPrefixDefinition + string(kv.Value) + Slash))
+				keyA := bytes.TrimPrefix(kvA.Key, []byte(HealthCheckPrefixDefinition+string(kv.Value)+Slash))
 				if bytes.Equal(keyA, IdKeyBytes) {
 					// do nothing
 				} else if bytes.Equal(keyA, PathKeyBytes) {
 					hc.path = kvA.Value
 				} else if bytes.Equal(keyA, TimeoutKeyBytes) {
-					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10 ,64)
+					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
 						log.Print(err)
 						return nil, err
 					}
 					hc.timeout = uint8(tmpInt)
 				} else if bytes.Equal(keyA, IntervalKeyBytes) {
-					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10 ,64)
+					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
 						log.Print(err)
 						return nil, err
 					}
 					hc.interval = uint8(tmpInt)
 				} else if bytes.Equal(keyA, RetryKeyBytes) {
-					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10 ,64)
+					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
 						log.Print(err)
 						return nil, err
@@ -312,7 +289,7 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 						hc.retry = true
 					}
 				} else if bytes.Equal(keyA, RetryTimeKeyBytes) {
-					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10 ,64)
+					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
 						log.Print(err)
 						return nil, err
@@ -350,10 +327,11 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 		log.Print(err)
 		return nil, nil, err
 	}
-	for _, kv := range resp.Kvs{
+	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, RouterDefinitionBytes)
 		tmpSlice := bytes.Split(key, SlashBytes)
 		if len(tmpSlice) != 2 {
+			log.SetPrefix("[WARNING]")
 			log.Printf("invalid router definition: %s", key)
 			continue
 		} else {
@@ -366,25 +344,78 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 					if !bytes.Equal(rName, kv.Value) {
 						log.SetPrefix("[WARNING]")
 						log.Printf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
+						continue
 					}
 				} else if bytes.Equal(attr, FrontendApiKeyBytes) {
 					r.frontendApi = &FrontendApi{
-						path: kv.Value,
+						path:       kv.Value,
 						pathString: FrontendApiString(kv.Value),
-						pattern: bytes.Split(kv.Value, SlashBytes),
+						pattern:    bytes.Split(kv.Value, SlashBytes),
 					}
 				} else if bytes.Equal(attr, BackendApiKeyBytes) {
 					r.backendApi = &BackendApi{
-						path: kv.Value,
+						path:       kv.Value,
 						pathString: BackendApiString(kv.Value),
-						pattern: bytes.Split(kv.Value, SlashBytes),
+						pattern:    bytes.Split(kv.Value, SlashBytes),
 					}
 				} else if bytes.Equal(attr, ServiceKeyBytes) {
-
+					if svr, ok := svrMap.Load(ServiceNameString(kv.Value)); ok {
+						r.service = svr
+					} else {
+						log.SetPrefix("[ERROR]")
+						log.Print("service not exist")
+						continue
+					}
+				} else {
+					log.SetPrefix("[WARNING]")
+					log.Printf("unrecognized health check attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
+				}
+			} else {
+				r := Router{}
+				if bytes.Equal(attr, IdKeyBytes) {
+					// do nothing
+				} else if bytes.Equal(attr, NameKeyBytes) {
+					if !bytes.Equal(rName, kv.Value) {
+						log.SetPrefix("[WARNING]")
+						log.Printf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
+						continue
+					} else {
+						r.name = rName
+					}
+					rtMap.Store(RouterNameString(r.name), &r)
+				} else if bytes.Equal(attr, FrontendApiKeyBytes) {
+					r.frontendApi = &FrontendApi{
+						path:       kv.Value,
+						pathString: FrontendApiString(kv.Value),
+						pattern:    bytes.Split(kv.Value, SlashBytes),
+					}
+					rtMap.Store(RouterNameString(r.name), &r)
+				} else if bytes.Equal(attr, BackendApiKeyBytes) {
+					r.backendApi = &BackendApi{
+						path:       kv.Value,
+						pathString: BackendApiString(kv.Value),
+						pattern:    bytes.Split(kv.Value, SlashBytes),
+					}
+					rtMap.Store(RouterNameString(r.name), &r)
+				} else if bytes.Equal(attr, ServiceKeyBytes) {
+					if svr, ok := svrMap.Load(ServiceNameString(kv.Value)); ok {
+						r.service = svr
+						rtMap.Store(RouterNameString(r.name), &r)
+					} else {
+						log.SetPrefix("[ERROR]")
+						log.Print("service not exist")
+						continue
+					}
+				} else {
+					log.SetPrefix("[WARNING]")
+					log.Printf("unrecognized health check attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
 				}
 			}
 		}
 	}
 
+	rtMap.Range(func(key RouterNameString, value *Router) {
+		artMap.Store(value.frontendApi.pathString, value)
+	})
+	return &rtMap, &artMap, nil
 }
-

@@ -236,3 +236,11 @@ func (m *RouterTableMap) Store(key RouterNameString, value *Router) {
 	m.internal[key] = value
 	m.Unlock()
 }
+
+func (m *RouterTableMap) Range(f func(key RouterNameString, value *Router)) {
+	m.RLock()
+	for k, v := range m.internal {
+		f(k, v)
+	}
+	m.RUnlock()
+}

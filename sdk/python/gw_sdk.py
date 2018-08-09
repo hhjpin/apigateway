@@ -7,10 +7,10 @@ Node:
 
 """
 
-
-import uuid
-import etcd3
 import logging
+import uuid
+
+import etcd3
 import simplejson as json
 
 from .const import *
@@ -67,6 +67,10 @@ class String(str, Tag):
     def value(self):
         return self.__str__()
 
+    @value.setter
+    def value(self, v: str):
+        super(String, self).__init__(value=v)
+
 
 class Slice(list, Tag):
 
@@ -83,6 +87,11 @@ class Slice(list, Tag):
             new.append(i)
         return new
 
+    @value.setter
+    def value(self, v: list):
+        self.clear()
+        self.extend(v)
+
     @property
     def bytes(self):
         return bytes(json.dumps(self.value))
@@ -97,6 +106,10 @@ class Integer(int, Tag):
     @property
     def value(self):
         return self
+
+    @value.setter
+    def value(self, v: int):
+        super(Integer, self).__init__(x=v)
 
 
 class Boolean(bool, Tag):
@@ -121,7 +134,7 @@ class HealthCheckDefinition(GatewayDefinition):
     def __init__(self, path: String, timeout: Integer,
                  interval: Integer, retry: bool, retry_time: Integer):
         uid = str(uuid.getnode())
-        self.id = String("ID", uid)
+        self.id.value = uid
         self.path = path
         self.timeout = timeout
         self.interval = interval
@@ -139,7 +152,7 @@ class NodeDefinition(GatewayDefinition):
 
     def __init__(self, name: String, host: String, port: Integer, status: Integer, health_check: HealthCheckDefinition):
         uid = str(uuid.getnode())
-        self.id = String("ID", uid)
+        self.id.value = uid
         self.name = name + uid
         self.host = host
         self.port = port
@@ -151,15 +164,8 @@ class ServiceDefinition(GatewayDefinition):
     name = String("Name")
     node = Slice("Node")
 
-    def __init__(self, name: String, node_list: list):
+    def __init__(self, name: String):
         self.name = name
-
-        for n in node_list:
-            if isinstance(n, NodeDefinition):
-
-            else:
-                raise PredefinedTypeError
-        self.node = node.name
 
 
 class RouterDefinition(GatewayDefinition):
@@ -171,7 +177,7 @@ class RouterDefinition(GatewayDefinition):
 
     def __init__(self, name: String, frontend: String, backend: String, service: ServiceDefinition):
         uid = str(uuid.getnode())
-        self.id = String("ID", uid)
+        self.id.value = uid
         self.name = name + uid
         self.frontend = frontend
         self.backend = backend
@@ -265,16 +271,18 @@ class ApiGatewayRegistrant(object):
 
             flag = 0
             for n in node_slice:
-                if n == self._node.id:
+                if n == self._node.id.value:
                     flag = 1
                     break
             if flag == 0 and len(node_slice) > 0:
-                node_slice.append(self._node.id)
+                node_slice.append(self._node.id.value)
                 c.put(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.name, s.node.name]),
                       bytes(json.dumps(node_slice)))
         else:
             # service not exits, put new one
             put(c, s.name, s.name)
+            s.node.value = [self._node.id.value]
+            put(c, s.name, s.node)
 
     def _register_router(self):
         if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):
