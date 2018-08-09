@@ -1,6 +1,13 @@
 #!/etc/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+Node:
+    /Node/Node-0123456/Name
+
+"""
+
+
 import uuid
 import etcd3
 import logging
@@ -52,8 +59,8 @@ class Tag(object):
 
 class String(str, Tag):
 
-    def __init__(self, tag: str):
-        super(String, self).__init__()
+    def __init__(self, tag: str, value=None):
+        super(String, self).__init__(value=str(value))
         self._tag = tag
 
     @property
@@ -63,8 +70,10 @@ class String(str, Tag):
 
 class Slice(list, Tag):
 
-    def __init__(self, tag: str):
+    def __init__(self, tag: str, value: list = None):
         super(Slice, self).__init__()
+        if value:
+            self.extend(value)
         self._tag = tag
 
     @property
@@ -81,8 +90,8 @@ class Slice(list, Tag):
 
 class Integer(int, Tag):
 
-    def __init__(self, tag: str):
-        super(Integer, self).__init__()
+    def __init__(self, tag: str, value: int = 0):
+        super(Integer, self).__init__(x=value)
         self._tag = tag
 
     @property
@@ -101,11 +110,6 @@ class Boolean(bool, Tag):
         return bytes(1) if self is True else bytes(0)
 
 
-class ServiceDefinition(GatewayDefinition):
-    name = String("Name")
-    node = Slice("Node")
-
-
 class HealthCheckDefinition(GatewayDefinition):
     id = String("ID")
     path = String("Path")
@@ -113,6 +117,16 @@ class HealthCheckDefinition(GatewayDefinition):
     interval = Integer("Interval")
     retry = Integer("Retry")
     retry_time = Integer("RetryTime")
+
+    def __init__(self, path: String, timeout: Integer,
+                 interval: Integer, retry: bool, retry_time: Integer):
+        uid = str(uuid.getnode())
+        self.id = String("ID", uid)
+        self.path = path
+        self.timeout = timeout
+        self.interval = interval
+        self.retry = Integer("Retry", 1 if retry else 0)
+        self.retry_time = retry_time
 
 
 class NodeDefinition(GatewayDefinition):
@@ -123,6 +137,30 @@ class NodeDefinition(GatewayDefinition):
     status = Integer("Status")
     health_check = String("HealthCheck")
 
+    def __init__(self, name: String, host: String, port: Integer, status: Integer, health_check: HealthCheckDefinition):
+        uid = str(uuid.getnode())
+        self.id = String("ID", uid)
+        self.name = name + uid
+        self.host = host
+        self.port = port
+        self.status = status
+        self.health_check = health_check.id
+
+
+class ServiceDefinition(GatewayDefinition):
+    name = String("Name")
+    node = Slice("Node")
+
+    def __init__(self, name: String, node_list: list):
+        self.name = name
+
+        for n in node_list:
+            if isinstance(n, NodeDefinition):
+
+            else:
+                raise PredefinedTypeError
+        self.node = node.name
+
 
 class RouterDefinition(GatewayDefinition):
     id = String("ID")
@@ -130,6 +168,14 @@ class RouterDefinition(GatewayDefinition):
     frontend = String("FrontendApi")
     backend = String("BackendApi")
     service = String("Service")
+
+    def __init__(self, name: String, frontend: String, backend: String, service: ServiceDefinition):
+        uid = str(uuid.getnode())
+        self.id = String("ID", uid)
+        self.name = name + uid
+        self.frontend = frontend
+        self.backend = backend
+        self.service = service.name
 
 
 class EtcdConf(object):
@@ -148,15 +194,6 @@ class ApiGatewayRegistrant(object):
                  hc: HealthCheckDefinition, etcd_conf: EtcdConf, router: list):
         self._client = None
         self._router = list()
-
-        uid = uuid.getnode()
-        hc.id = uid
-        node.id = uid
-        node.name += uid
-        node.status = 0
-        node.health_check = uid
-        service.id = uid
-        service.name += uid
         self._hc = hc
         self._node = node
         self._service = service
@@ -246,21 +283,21 @@ class ApiGatewayRegistrant(object):
         c = self._client
         rl = self._router
 
-        def put(cli, router_id, attr):
-            cli.put(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + router_id, attr.name]), attr.bytes)
+        def put(cli, router_name, attr):
+            cli.put(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + router_name, attr.name]), attr.bytes)
 
         for r in rl:
-            v = c.get(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + r.id, r.id.name]))
-            if r.id == v:
+            v = c.get(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + r.name, r.name.name]))
+            if r.name == v:
                 # router exists, update
                 pass
             else:
-                put(c, r.id, r.id)
+                put(c, r.name, r.name)
 
-            put(c, r.id, r.name)
-            put(c, r.id, r.service)
-            put(c, r.id, r.frontend)
-            put(c, r.id, r.backend)
+            put(c, r.name, r.id)
+            put(c, r.name, r.service)
+            put(c, r.name, r.frontend)
+            put(c, r.name, r.backend)
 
     def _register_hc(self):
         if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):

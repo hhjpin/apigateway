@@ -10,6 +10,7 @@ import (
 	"time"
 	"strconv"
 	"api_gateway/utils/errors"
+	"encoding/json"
 )
 
 const (
@@ -31,6 +32,7 @@ const (
 	RetryKey          = "Retry"
 	RetryTimeKey      = "RetryTime"
 
+	RouterDefinition = "/Router/"
 	ServiceDefinition = "/Service/"
 	NodePrefixDefinition = "/Node/Node-"
 	HealthCheckPrefixDefinition = "/HealthCheck/HC-"
@@ -52,12 +54,15 @@ var (
 	HostKeyBytes = []byte("Host")
 	PortKeyBytes = []byte("Port")
 	StatusKeyBytes = []byte("Status")
+	FrontendApiKeyBytes = []byte("FrontendApi")
+	BackendApiKeyBytes = []byte("BackendApi")
 	PathKeyBytes           = []byte("Path")
 	TimeoutKeyBytes        = []byte("Timeout")
 	IntervalKeyBytes       = []byte("Interval")
 	RetryKeyBytes          = []byte("Retry")
 	RetryTimeKeyBytes      = []byte("RetryTime")
 
+	RouterDefinitionBytes = []byte("/Router/")
 	NodeDefinitionBytes = []byte("/Node/")
 	ServiceDefinitionBytes = []byte("/Service/")
 
@@ -122,9 +127,9 @@ func InitRoutingTable() *RoutingTable {
 	return nil
 }
 
-func initServiceNode(cli *clientv3.Client) (ServiceTableMap, EndpointTableMap) {
-	var svr ServiceTableMap
-	var ep EndpointTableMap
+func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap, error) {
+	var svrMap ServiceTableMap
+	var epMap EndpointTableMap
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	resp, err := cli.Get(ctx, ServiceDefinition, clientv3.WithPrefix())
@@ -140,15 +145,36 @@ func initServiceNode(cli *clientv3.Client) (ServiceTableMap, EndpointTableMap) {
 			continue
 		} else {
 			sName := bytes.TrimPrefix(tmp[0], ServicePrefixBytes)
-			if s, ok := svr.Load(ServiceNameString(sName)); ok {
+			if s, ok := svrMap.Load(ServiceNameString(sName)); ok {
 				// service exists
 				if bytes.Equal(tmp[1], NameKeyBytes) {
 					s.name = kv.Value
 					s.nameString = ServiceNameString(kv.Value)
 				} else if bytes.Equal(tmp[1], NodeKeyBytes){
 					// check node
+					var nodeSlice []string
+
+					err = json.Unmarshal(kv.Value, &nodeSlice)
+					if err != nil {
+						log.Print(err)
+						return nil, nil, err
+					}
+					for _, n := range nodeSlice {
+						ep, err := initEndpointNode(cli, n)
+						if err != nil {
+							log.Print(err)
+							return nil, nil, err
+						}
+						if _, ok := s.ep.Load(ep.nameString); !ok {
+							s.ep.Store(ep.nameString, ep)
+						}
+					}
+					s.ep.Range(func(key EndpointNameString, value *Endpoint) {
+						epMap.Store(key, value)
+					})
 				} else {
-					log.Printf("invalid service attribute: %s", tmp[1])
+					log.SetPrefix("[WARNING]")
+					log.Printf("unrecognized node attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
 				}
 			} else {
 				if bytes.Equal(tmp[1], NameKeyBytes) {
@@ -159,31 +185,53 @@ func initServiceNode(cli *clientv3.Client) (ServiceTableMap, EndpointTableMap) {
 							ep: nil,
 							onlineEp: nil,
 						}
-						svr.Store(ServiceNameString(sName), s)
+						svrMap.Store(ServiceNameString(sName), s)
 					} else {
 						log.Printf("invalid service name, key: %s", string(kv.Key))
 					}
 				} else if bytes.Equal(tmp[1], NodeKeyBytes) {
+					var nodeSlice []string
+					var epSlice EndpointTableMap
+
 					s = &Service{
 						name: sName,
 						nameString: ServiceNameString(sName),
 						ep: nil,
 						onlineEp: nil,
 					}
-					
+					err = json.Unmarshal(kv.Value, &nodeSlice)
+					if err != nil {
+						log.Print(err)
+						return nil, nil, err
+					}
+					for _, n := range nodeSlice {
+						ep, err := initEndpointNode(cli, n)
+						if err != nil {
+							log.Print(err)
+							return nil, nil, err
+						}
+						epSlice.Store(ep.nameString, ep)
+					}
+					s.ep = &epSlice
+					svrMap.Store(s.nameString, s)
+					s.ep.Range(func(key EndpointNameString, value *Endpoint) {
+						epMap.Store(key, value)
+					})
 				} else {
-
+					log.SetPrefix("[WARNING]")
+					log.Printf("unrecognized node attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
 				}
 			}
 		}
 	}
+	return &svrMap, &epMap, nil
 }
 
 func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 	var ep Endpoint
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	resp, err := cli.Get(ctx, NodePrefixDefinition + nodeID)
+	resp, err := cli.Get(ctx, NodePrefixDefinition + nodeID, clientv3.WithPrefix())
 	cancel()
 	if err != nil {
 		log.Print(err)
@@ -224,7 +272,7 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 		} else if bytes.Equal(key, HealthCheckKeyBytes) {
 			// get health check info
 			ctxA, cancelA := context.WithTimeout(context.Background(), 1*time.Second)
-			respA, err := cli.Get(ctxA, HealthCheckPrefixDefinition + string(kv.Value))
+			respA, err := cli.Get(ctxA, HealthCheckPrefixDefinition + string(kv.Value), clientv3.WithPrefix())
 			cancelA()
 			if err != nil {
 				log.Print(err)
@@ -289,5 +337,54 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 		return nil, errors.New(51)
 	}
 	return &ep, nil
+}
+
+func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap, *ApiRouterTableMap, error) {
+	var rtMap RouterTableMap
+	var artMap ApiRouterTableMap
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	resp, err := cli.Get(ctx, RouterDefinition, clientv3.WithPrefix())
+	cancel()
+	if err != nil {
+		log.Print(err)
+		return nil, nil, err
+	}
+	for _, kv := range resp.Kvs{
+		key := bytes.TrimPrefix(kv.Key, RouterDefinitionBytes)
+		tmpSlice := bytes.Split(key, SlashBytes)
+		if len(tmpSlice) != 2 {
+			log.Printf("invalid router definition: %s", key)
+			continue
+		} else {
+			rName := bytes.TrimPrefix(tmpSlice[0], RouterPrefixBytes)
+			attr := tmpSlice[1]
+			if r, ok := rtMap.Load(RouterNameString(rName)); ok {
+				if bytes.Equal(attr, IdKeyBytes) {
+					// do nothing
+				} else if bytes.Equal(attr, NameKeyBytes) {
+					if !bytes.Equal(rName, kv.Value) {
+						log.SetPrefix("[WARNING]")
+						log.Printf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
+					}
+				} else if bytes.Equal(attr, FrontendApiKeyBytes) {
+					r.frontendApi = &FrontendApi{
+						path: kv.Value,
+						pathString: FrontendApiString(kv.Value),
+						pattern: bytes.Split(kv.Value, SlashBytes),
+					}
+				} else if bytes.Equal(attr, BackendApiKeyBytes) {
+					r.backendApi = &BackendApi{
+						path: kv.Value,
+						pathString: BackendApiString(kv.Value),
+						pattern: bytes.Split(kv.Value, SlashBytes),
+					}
+				} else if bytes.Equal(attr, ServiceKeyBytes) {
+
+				}
+			}
+		}
+	}
+
 }
 
