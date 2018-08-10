@@ -536,6 +536,10 @@ func (r *Router) equal(another *Router) bool {
 	}
 }
 
+func (r *Router) CheckStatus() (bool, error) {
+	
+}
+
 func (s *Service) equal(another *Service) bool {
 	if bytes.Equal(s.name, another.name) && s.nameString == another.nameString && s.ep.equal(another.ep) {
 		return true

@@ -50,4 +50,7 @@ func init() {
 
 	BaseErrors[50] = BaseErrMsg{ErrMsg: "不正确的状态数值", ErrMsgEn: "invalid status code"}
 	BaseErrors[51] = BaseErrMsg{ErrMsg: "终端节点属性值不全", ErrMsgEn: "uncompleted attribute assigned"}
+
+	BaseErrors[60] = BaseErrMsg{ErrMsg: "缺少健康检查配置", ErrMsgEn: "health check not defined"}
+	BaseErrors[61] = BaseErrMsg{ErrMsg: "健康检查失败", ErrMsgEn: "health check failed"}
 }

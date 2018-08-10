@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"runtime"
 )
 
 const (
@@ -99,9 +100,47 @@ func ConnectToEtcd() *clientv3.Client {
 	}
 }
 
-func InitRoutingTable() *RoutingTable {
+func InitRoutingTable(cli *clientv3.Client) *RoutingTable {
+	var cpuNum int
+	var rt RoutingTable
+	var epSlice []*Endpoint
+	cpuNum = runtime.NumCPU()
 
-	return nil
+	rt.Version = "1.0.0"
+	svrMap, epMap, err := initServiceNode(cli)
+	if err != nil {
+		log.Fatal(err)
+	}
+	rt.serviceTable = *svrMap
+	rt.endpointTable = *epMap
+
+	routerTable, table, err := initRouter(cli, &rt.serviceTable)
+	if err != nil {
+		log.Fatal(err)
+	}
+	rt.table = *table
+	rt.routerTable = *routerTable
+
+	rt.endpointTable.Range(func(key EndpointNameString, value *Endpoint) {
+		if value.healthCheck.path != nil {
+			epSlice = append(epSlice, value)
+		}
+	})
+	for i := 0; i < cpuNum; i++{
+		go func(eSlice []*Endpoint) {
+			for _, ep := range eSlice {
+				if check, err := ep.healthCheck.Check(ep.host, ep.port); check {
+					ep.setStatus(Online)
+				} else {
+					ep.setStatus(BreakDown)
+					log.SetPrefix("[ERROR]")
+					log.Print(err)
+				}
+			}
+		}(epSlice[0:len(epSlice)-1:cpuNum])
+	}
+
+	return &rt
 }
 
 func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap, error) {
@@ -257,6 +296,7 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 			}
 
 			var hc HealthCheck
+			hc.path = nil
 			for _, kvA := range respA.Kvs {
 				keyA := bytes.TrimPrefix(kvA.Key, []byte(HealthCheckPrefixDefinition+string(kv.Value)+Slash))
 				if bytes.Equal(keyA, IdKeyBytes) {
