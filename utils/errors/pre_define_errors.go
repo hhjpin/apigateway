@@ -44,13 +44,15 @@ func init() {
 	BaseErrors[39] = BaseErrMsg{ErrMsg: "无法找到终端服务", ErrMsgEn: "can not find endpoint by name"}
 	BaseErrors[40] = BaseErrMsg{ErrMsg: "轮询终端服务队列时发生异常: 节点数据错误", ErrMsgEn: "the Ring of endpoints contains an invalid value"}
 	BaseErrors[41] = BaseErrMsg{ErrMsg: "轮询终端服务队列时发生异常: 无一节点在线", ErrMsgEn: "all node of rings is not online"}
-
 	BaseErrors[42] = BaseErrMsg{ErrMsg: "外层API不存在", ErrMsgEn: "frontend api not found"}
 	BaseErrors[43] = BaseErrMsg{ErrMsg: "路由规则不在线", ErrMsgEn: "router is not online"}
+	BaseErrors[44] = BaseErrMsg{ErrMsg: "服务对应的终端节点无一在线", ErrMsgEn: "all node of rings is not online"}
 
 	BaseErrors[50] = BaseErrMsg{ErrMsg: "不正确的状态数值", ErrMsgEn: "invalid status code"}
 	BaseErrors[51] = BaseErrMsg{ErrMsg: "终端节点属性值不全", ErrMsgEn: "uncompleted attribute assigned"}
 
 	BaseErrors[60] = BaseErrMsg{ErrMsg: "缺少健康检查配置", ErrMsgEn: "health check not defined"}
 	BaseErrors[61] = BaseErrMsg{ErrMsg: "健康检查失败", ErrMsgEn: "health check failed"}
+
+	BaseErrors[70] = BaseErrMsg{ErrMsg: "无法生成Token令牌", ErrMsgEn: "can not generate token bucket"}
 }

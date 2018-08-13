@@ -8,10 +8,10 @@ import (
 	"encoding/json"
 	"github.com/coreos/etcd/clientv3"
 	"log"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
-	"runtime"
 )
 
 const (
@@ -126,7 +126,7 @@ func InitRoutingTable(cli *clientv3.Client) *RoutingTable {
 			epSlice = append(epSlice, value)
 		}
 	})
-	for i := 0; i < cpuNum; i++{
+	for i := 0; i < cpuNum; i++ {
 		go func(eSlice []*Endpoint) {
 			for _, ep := range eSlice {
 				if check, err := ep.healthCheck.Check(ep.host, ep.port); check {
@@ -137,8 +137,19 @@ func InitRoutingTable(cli *clientv3.Client) *RoutingTable {
 					log.Print(err)
 				}
 			}
-		}(epSlice[0:len(epSlice)-1:cpuNum])
+		}(epSlice[0 : len(epSlice)-1 : cpuNum])
 	}
+	rt.routerTable.Range(func(key RouterNameString, value *Router) {
+		if value.CheckStatus(Online) {
+			value.setStatus(Online)
+		} else {
+			value.setStatus(Offline)
+		}
+		confirm, _ := value.service.checkEndpointStatus(Online)
+		if err := value.service.ResetOnlineEndpointRing(confirm); err != nil {
+			log.Print(err)
+		}
+	})
 
 	return &rt
 }

@@ -22,6 +22,7 @@ import (
 	"container/ring"
 	"github.com/deckarep/golang-set"
 	"log"
+	"github.com/golang/time/rate"
 )
 
 const (
@@ -83,7 +84,7 @@ type Endpoint struct {
 	status Status // 0 -> offline, 1 -> online, 2 -> breakdown
 
 	healthCheck *HealthCheck
-	rate        *TokenBucketRateLimit
+	rate        *rate.Limiter
 }
 
 // Service-struct defined a backend-service
@@ -425,7 +426,7 @@ func (r *RoutingTable) RemoveService(svr *Service) error {
 	return err
 }
 
-func (r *RoutingTable) CreateEndpoint(name, host []byte, port uint8, hc *HealthCheck, rate *TokenBucketRateLimit) *Endpoint {
+func (r *RoutingTable) CreateEndpoint(name, host []byte, port uint8, hc *HealthCheck, rate *rate.Limiter) *Endpoint {
 
 	endpoint, exists := r.endpointTable.Load(EndpointNameString(name))
 	if exists {
@@ -536,8 +537,14 @@ func (r *Router) equal(another *Router) bool {
 	}
 }
 
-func (r *Router) CheckStatus() (bool, error) {
-	
+func (r *Router) CheckStatus(must Status) bool {
+	confirm, _ := r.service.checkEndpointStatus(must)
+	if len(confirm) == 0 {
+		// not online
+		return false
+	} else {
+		return true
+	}
 }
 
 func (s *Service) equal(another *Service) bool {
@@ -570,13 +577,33 @@ func (s *Service) AddEndpoint(ep *Endpoint) (bool, error) {
 			return false, errors.New(22)
 		}
 	} else {
+		if ep.status == Online {
+			newNode := ring.New(1)
+			newNode.Value = ep.nameString
+			n := s.onlineEp.Link(newNode)
+			newNode.Link(n)
+		}
 		s.ep.Store(ep.nameString, ep)
-		newNode := ring.New(1)
-		newNode.Value = ep.nameString
-		n := s.onlineEp.Link(newNode)
-		newNode.Link(n)
+
 		return true, nil
 	}
+}
+
+func (s *Service) ResetOnlineEndpointRing (online []*Endpoint) error {
+	if len(online) == 0 {
+		return errors.New(44)
+	}
+	for idx, ep := range online {
+		newNode := ring.New(1)
+		newNode.Value = ep.nameString
+		if idx == 0 {
+			s.onlineEp = newNode
+		} else {
+			r := s.onlineEp.Link(newNode)
+			newNode.Link(r)
+		}
+	}
+	return nil
 }
 
 func (ep *Endpoint) equal(another *Endpoint) bool {
