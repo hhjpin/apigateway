@@ -7,10 +7,10 @@ Node:
 
 """
 
-import logging
+import sys
 import uuid
-
 import etcd3
+import logging
 import simplejson as json
 
 from .const import *
@@ -135,11 +135,11 @@ class HealthCheckDefinition(GatewayDefinition):
                  interval: Integer, retry: bool, retry_time: Integer):
         uid = str(uuid.getnode())
         self.id.value = uid
-        self.path = path
-        self.timeout = timeout
-        self.interval = interval
-        self.retry = Integer("Retry", 1 if retry else 0)
-        self.retry_time = retry_time
+        self.path.value = path
+        self.timeout.value = timeout
+        self.interval.value = interval
+        self.retry.value = Integer("Retry", 1 if retry else 0)
+        self.retry_time.value = retry_time
 
 
 class NodeDefinition(GatewayDefinition):
@@ -153,11 +153,11 @@ class NodeDefinition(GatewayDefinition):
     def __init__(self, name: String, host: String, port: Integer, status: Integer, health_check: HealthCheckDefinition):
         uid = str(uuid.getnode())
         self.id.value = uid
-        self.name = name + uid
-        self.host = host
-        self.port = port
-        self.status = status
-        self.health_check = health_check.id
+        self.name.value = name + uid
+        self.host.value = host
+        self.port.value = port
+        self.status.value = status
+        self.health_check.value = health_check.id
 
 
 class ServiceDefinition(GatewayDefinition):
@@ -165,7 +165,7 @@ class ServiceDefinition(GatewayDefinition):
     node = Slice("Node")
 
     def __init__(self, name: String):
-        self.name = name
+        self.name.value = name
 
 
 class RouterDefinition(GatewayDefinition):
@@ -178,10 +178,10 @@ class RouterDefinition(GatewayDefinition):
     def __init__(self, name: String, frontend: String, backend: String, service: ServiceDefinition):
         uid = str(uuid.getnode())
         self.id.value = uid
-        self.name = name + uid
-        self.frontend = frontend
-        self.backend = backend
-        self.service = service.name
+        self.name.value = name + uid
+        self.frontend.value = frontend
+        self.backend.value = backend
+        self.service.value = service.name
 
 
 class EtcdConf(object):
@@ -295,6 +295,12 @@ class ApiGatewayRegistrant(object):
             cli.put(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + router_name, attr.name]), attr.bytes)
 
         for r in rl:
+            v = c.get(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + r.name, r.frontend.name]))
+            if r.frontend == v:
+                # frontend api exists, terminated!
+                logging.error("frontend api [%s] exists, terminated" % r.frontend.value)
+                sys.exit(-1)
+
             v = c.get(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + r.name, r.name.name]))
             if r.name == v:
                 # router exists, update
