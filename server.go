@@ -2,7 +2,6 @@ package main
 
 import (
 	"api_gateway/core"
-	"api_gateway/utils"
 	"fmt"
 	"github.com/valyala/fasthttp"
 	"log"
@@ -22,16 +21,16 @@ func main() {
 	server = &fasthttp.Server{
 		Handler: core.MainRequestHandlerWrapper(table),
 
-		Name:               utils.Conf.Server.Name,
-		Concurrency:        utils.Conf.Server.Concurrency,
-		ReadBufferSize:     utils.Conf.Server.ReadBufferSize,
-		WriteBufferSize:    utils.Conf.Server.WriteBufferSize,
-		DisableKeepalive:   utils.Conf.Server.DisabledKeepAlive,
-		ReduceMemoryUsage:  utils.Conf.Server.ReduceMemoryUsage,
-		MaxRequestBodySize: utils.Conf.Server.MaxRequestBodySize,
+		Name:               Conf.Server.Name,
+		Concurrency:        Conf.Server.Concurrency,
+		ReadBufferSize:     Conf.Server.ReadBufferSize,
+		WriteBufferSize:    Conf.Server.WriteBufferSize,
+		DisableKeepalive:   Conf.Server.DisabledKeepAlive,
+		ReduceMemoryUsage:  Conf.Server.ReduceMemoryUsage,
+		MaxRequestBodySize: Conf.Server.MaxRequestBodySize,
 	}
 
-	host := fmt.Sprintf("%s:%d", utils.Conf.Server.ListenHost, utils.Conf.Server.ListenPort)
+	host := fmt.Sprintf("%s:%d", Conf.Server.ListenHost, Conf.Server.ListenPort)
 	log.Print(host)
 	err := server.ListenAndServe(host)
 	if err != nil {
