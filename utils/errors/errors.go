@@ -12,7 +12,7 @@ const (
 
 // Error holds the error message, this message never really changes
 type Error struct {
-	ErrCode int `json:"err_code"`
+	ErrCode ErrCode `json:"err_code"`
 	// The message of the error.
 	ErrMsg string `json:"err_msg"`
 	// The message of the error.
@@ -22,8 +22,8 @@ type Error struct {
 type CustomErrMsg BaseErrMsg
 
 // New creates and returns an Error with a pre-defined user output message
-func New(errCode int, errMsg ...CustomErrMsg) Error {
-	if _, ok := BaseErrors[errCode]; ok {
+func New(errCode ErrCode, errMsg ...CustomErrMsg) Error {
+	if _, ok := baseErrors[errCode]; ok {
 		if len(errMsg) > 1 {
 			log.SetPrefix("[WARNING]")
 			log.Print("redundant errMsg parameters")
@@ -36,12 +36,12 @@ func New(errCode int, errMsg ...CustomErrMsg) Error {
 			if errMsg[0].ErrMsg != "" {
 				tmpErrMsg = errMsg[0].ErrMsg
 			} else {
-				tmpErrMsg = BaseErrors[errCode].ErrMsg
+				tmpErrMsg = baseErrors[errCode].ErrMsg
 			}
 			if errMsg[0].ErrMsgEn != "" {
 				tmpErrMsgEn = errMsg[0].ErrMsgEn
 			} else {
-				tmpErrMsgEn = BaseErrors[errCode].ErrMsgEn
+				tmpErrMsgEn = baseErrors[errCode].ErrMsgEn
 			}
 			return Error{
 				ErrCode:  errCode,
@@ -51,8 +51,8 @@ func New(errCode int, errMsg ...CustomErrMsg) Error {
 		} else {
 			return Error{
 				ErrCode:  errCode,
-				ErrMsg:   BaseErrors[errCode].ErrMsg,
-				ErrMsgEn: BaseErrors[errCode].ErrMsgEn,
+				ErrMsg:   baseErrors[errCode].ErrMsg,
+				ErrMsgEn: baseErrors[errCode].ErrMsgEn,
 			}
 		}
 	} else {
