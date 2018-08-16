@@ -1,9 +1,9 @@
 package core
 
 import (
-	"testing"
 	"context"
 	"log"
+	"testing"
 )
 
 func TestConnectToEtcd(t *testing.T) {

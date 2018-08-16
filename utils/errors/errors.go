@@ -1,9 +1,9 @@
 package errors
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
-	"encoding/json"
 )
 
 const (

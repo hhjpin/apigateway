@@ -21,8 +21,8 @@ import (
 	"bytes"
 	"container/ring"
 	"github.com/deckarep/golang-set"
-	"log"
 	"github.com/golang/time/rate"
+	"log"
 )
 
 const (
@@ -589,7 +589,7 @@ func (s *Service) AddEndpoint(ep *Endpoint) (bool, error) {
 	}
 }
 
-func (s *Service) ResetOnlineEndpointRing (online []*Endpoint) error {
+func (s *Service) ResetOnlineEndpointRing(online []*Endpoint) error {
 	if len(online) == 0 {
 		return errors.New(44)
 	}

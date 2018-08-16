@@ -20,7 +20,7 @@ const (
 	ErrTooMuchRequest
 	ErrServiceNotFound
 
-	ErrNeedLogin ErrCode = 40100
+	ErrNeedLogin    ErrCode = 40100
 	ErrTokenExpired ErrCode = 41101
 )
 
@@ -51,7 +51,6 @@ func init() {
 	baseErrors[4] = BaseErrMsg{ErrMsg: "服务维护中, 请稍后", ErrMsgEn: "service maintaining, please wait"}
 	baseErrors[5] = BaseErrMsg{ErrMsg: "访问量过大, 请稍后重试", ErrMsgEn: "router under flow control"}
 	baseErrors[6] = BaseErrMsg{ErrMsg: "请求的服务不存在", ErrMsgEn: "service not found"}
-
 
 	// router operating error
 	baseErrors[100] = BaseErrMsg{ErrMsg: "路由无效", ErrMsgEn: "routing table not exists"}
@@ -90,7 +89,6 @@ func init() {
 	baseErrors[161] = BaseErrMsg{ErrMsg: "健康检查失败", ErrMsgEn: "health check failed"}
 
 	baseErrors[170] = BaseErrMsg{ErrMsg: "无法生成Token令牌", ErrMsgEn: "can not generate token bucket"}
-
 
 	baseErrors[40100] = BaseErrMsg{ErrMsg: "需要重新登录", ErrMsgEn: "need login"}
 	baseErrors[41101] = BaseErrMsg{ErrMsg: "需要重新登录", ErrMsgEn: "need login"}

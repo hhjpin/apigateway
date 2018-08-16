@@ -171,6 +171,7 @@ class ServiceDefinition(GatewayDefinition):
 class RouterDefinition(GatewayDefinition):
     id = String("ID")
     name = String("Name")
+    status = String("Status")
     frontend = String("FrontendApi")
     backend = String("BackendApi")
     service = String("Service")
@@ -178,7 +179,8 @@ class RouterDefinition(GatewayDefinition):
     def __init__(self, name: String, frontend: String, backend: String, service: ServiceDefinition):
         uid = str(uuid.getnode())
         self.id.value = uid
-        self.name.value = name + uid
+        self.name.value = name
+        self.status.value = "0"
         self.frontend.value = frontend
         self.backend.value = backend
         self.service.value = service.name
@@ -236,18 +238,18 @@ class ApiGatewayRegistrant(object):
         def put(cli, node_id, attr):
             cli.put(ROOT + SLASH.join([NODE_KEY, NODE_PREFIX + node_id, attr.name]), attr.bytes)
 
-        v = c.get(ROOT + SLASH.join([NODE_KEY, NODE_PREFIX + n.id, n.id.name]))
-        if n.id == v:
+        v = c.get(ROOT + SLASH.join([NODE_KEY, NODE_PREFIX + n.id.value, n.id.name]))
+        if n.id.value == v:
             # node exists, update node
             pass
         else:
             # node not exists, put new one
-            put(c, n.id, n.id)
-        put(c, n.id, n.name)
-        put(c, n.id, n.host)
-        put(c, n.id, n.port)
-        put(c, n.id, n.status)
-        put(c, n.id, n.health_check)
+            put(c, n.id.value, n.id)
+        put(c, n.id.value, n.name)
+        put(c, n.id.value, n.host)
+        put(c, n.id.value, n.port)
+        put(c, n.id.value, n.status)
+        put(c, n.id.value, n.health_check)
 
     def _register_service(self):
         if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):
@@ -260,9 +262,9 @@ class ApiGatewayRegistrant(object):
             cli.put(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + service_name, attr.name]), attr.bytes)
 
         v = c.get(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.name, s.name.name]))
-        if s.name == v:
+        if s.name.value == v:
             # service exists, check node exists in service.node_slice
-            node_slice_json = c.get(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.name, s.node.name]))
+            node_slice_json = c.get(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.name.value, s.node.name]))
             try:
                 node_slice = json.loads(node_slice_json)
             except Exception as e:
@@ -276,13 +278,13 @@ class ApiGatewayRegistrant(object):
                     break
             if flag == 0 and len(node_slice) > 0:
                 node_slice.append(self._node.id.value)
-                c.put(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.name, s.node.name]),
+                c.put(ROOT + SLASH.join([SERVICE_KEY, SERVICE_PREFIX + s.name.value, s.node.name]),
                       bytes(json.dumps(node_slice)))
         else:
             # service not exits, put new one
-            put(c, s.name, s.name)
+            put(c, s.name.value, s.name)
             s.node.value = [self._node.id.value]
-            put(c, s.name, s.node)
+            put(c, s.name.value, s.node)
 
     def _register_router(self):
         if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):
@@ -295,23 +297,20 @@ class ApiGatewayRegistrant(object):
             cli.put(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + router_name, attr.name]), attr.bytes)
 
         for r in rl:
-            v = c.get(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + r.name, r.frontend.name]))
-            if r.frontend == v:
-                # frontend api exists, terminated!
-                logging.error("frontend api [%s] exists, terminated" % r.frontend.value)
-                sys.exit(-1)
-
-            v = c.get(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + r.name, r.name.name]))
-            if r.name == v:
-                # router exists, update
-                pass
+            v = c.get(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + r.name.value, r.name.name]))
+            if r.name.value == v:
+                stat = c.get(ROOT + SLASH.join([ROUTER_KEY, ROUTER_PREFIX + r.name.value, r.status.name]))
+                if str(stat) != "1":
+                    # router still online, can not be updated
+                    continue
             else:
-                put(c, r.name, r.name)
+                put(c, r.name.value, r.name)
 
-            put(c, r.name, r.id)
-            put(c, r.name, r.service)
-            put(c, r.name, r.frontend)
-            put(c, r.name, r.backend)
+            put(c, r.name.value, r.id)
+            put(c, r.name.value, r.status)
+            put(c, r.name.value, r.service)
+            put(c, r.name.value, r.frontend)
+            put(c, r.name.value, r.backend)
 
     def _register_hc(self):
         if self._client is None or not isinstance(self._client, etcd3.Etcd3Client):
@@ -323,15 +322,15 @@ class ApiGatewayRegistrant(object):
         def put(cli, hc_id, attr):
             cli.put(ROOT + SLASH.join([HEALTH_CHECK_KEY, HEALTH_CHECK_PREFIX + hc_id, attr.name]), attr.bytes)
 
-        v = c.get(ROOT + SLASH.join([HEALTH_CHECK_KEY, HEALTH_CHECK_PREFIX + hc.id, hc.id.name]))
-        if hc.id == v:
+        v = c.get(ROOT + SLASH.join([HEALTH_CHECK_KEY, HEALTH_CHECK_PREFIX + hc.id.value, hc.id.name]))
+        if hc.id.value == v:
             # health check exists, update
             pass
         else:
-            put(c, hc.id, hc.id)
+            put(c, hc.id.value, hc.id)
 
-        put(c, hc.id, hc.path)
-        put(c, hc.id, hc.interval)
-        put(c, hc.id, hc.timeout)
-        put(c, hc.id, hc.retry)
-        put(c, hc.id, hc.retry_time)
+        put(c, hc.id.value, hc.path)
+        put(c, hc.id.value, hc.interval)
+        put(c, hc.id.value, hc.timeout)
+        put(c, hc.id.value, hc.retry)
+        put(c, hc.id.value, hc.retry_time)

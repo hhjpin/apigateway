@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"net/smtp"
+	"strings"
 )
 
 func CollectPanic(body string) {

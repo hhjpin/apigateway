@@ -1,50 +1,53 @@
 package golang
 
 import (
-	"github.com/coreos/etcd/clientv3"
-	"log"
 	"context"
-	"time"
-	"fmt"
-	"errors"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/coreos/etcd/clientv3"
+	"github.com/deckarep/golang-set"
+	"log"
+	"time"
+	"bytes"
 )
 
-type Node struct{
-	ID string
-	Name string
-	Host string
-	Port uint8
+type Node struct {
+	ID     string
+	Name   string
+	Host   string
+	Port   uint8
 	Status uint8
-	HC *HealthCheck
+	HC     *HealthCheck
 }
-type Service struct{
+type Service struct {
 	Name string
 	Node []*Node
 }
-type Router struct{
-	ID string
-	Name string
+type Router struct {
+	ID       string
+	Name     string
+	Status 	 uint8
 	Frontend string
-	Backend string
-	Service *Service
+	Backend  string
+	Service  *Service
 }
-type HealthCheck struct{
-	ID string
-	Path string
-	Timeout uint8
-	Interval uint8
-	Retry bool
+type HealthCheck struct {
+	ID        string
+	Path      string
+	Timeout   uint8
+	Interval  uint8
+	Retry     bool
 	RetryTime uint8
 }
 
 type ApiGatewayRegistrant struct {
 	cli *clientv3.Client
 
-	node *Node
+	node    *Node
 	service *Service
-	hc *HealthCheck
-	router []*Router
+	hc      *HealthCheck
+	router  []*Router
 }
 
 func NewHealthCheck(path string, timeout, interval, retryTime uint8, retry bool) *HealthCheck {
@@ -63,7 +66,7 @@ func NewHealthCheck(path string, timeout, interval, retryTime uint8, retry bool)
 		Path:      path,
 		Timeout:   timeout,
 		Interval:  interval,
-		Retry:    	retry,
+		Retry:     retry,
 		RetryTime: retryTime,
 	}
 }
@@ -109,7 +112,8 @@ func NewRouter(name, frontend, backend string, service *Service) *Router {
 
 	return &Router{
 		ID:       uid,
-		Name:     name + uid,
+		Name:     name,
+		Status: 0,
 		Frontend: frontend,
 		Backend:  backend,
 		Service:  service,
@@ -204,36 +208,61 @@ func (gw *ApiGatewayRegistrant) putMany(kvs interface{}, opts ...clientv3.OpOpti
 }
 
 func (gw *ApiGatewayRegistrant) registerNode() error {
-	var kvs map[string][]string
-	kvs = make(map[string][]string)
+	var kvs map[string]string
+	kvs = make(map[string]string)
 
-	_, err := gw.getKeyValueWithPrefix(fmt.Sprintf(NodeDefinition, gw.node.ID))
+	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
+	_, err := gw.getKeyValueWithPrefix(nodeDefinition)
 	if err != nil {
 		log.Print(err)
 		return err
 	}
-	kvs[fmt.Sprintf(NodeDefinition, gw.node.ID) + IDKey] = []string{
-		gw.node.ID,
-		gw.node.Name,
-		gw.node.Host,
-		string(gw.node.Port),
-		string(gw.node.Status),
-		gw.node.HC.ID,
-	}
+	kvs[nodeDefinition+IDKey] = gw.node.ID
+	kvs[nodeDefinition+NameKey] = gw.node.Name
+	kvs[nodeDefinition+HostKey] = gw.node.Host
+	kvs[nodeDefinition+PortKey] = string(gw.node.Port)
+	kvs[nodeDefinition+StatusKey] = string(gw.node.Status)
+	kvs[nodeDefinition+HealthCheckKey] = gw.node.HC.ID
 
 	err = gw.putMany(kvs)
 	if err != nil {
 		log.Print(err)
+		return err
+	}
+
+	hcDefinition := fmt.Sprintf(HealthCheckDefinition, gw.hc.ID)
+	_, err = gw.getKeyValueWithPrefix(hcDefinition)
+	if err != nil {
+		log.Print(err)
+		return err
+	}
+	kvs = make(map[string]string)
+	kvs[hcDefinition+IDKey] = gw.hc.ID
+	kvs[hcDefinition+PathKey] = gw.hc.Path
+	kvs[hcDefinition+TimeoutKey] = string(gw.hc.Timeout)
+	kvs[hcDefinition+IntervalKey] = string(gw.hc.Interval)
+	kvs[hcDefinition+TimeoutKey] = string(gw.hc.Timeout)
+	if gw.hc.Retry {
+		kvs[hcDefinition+RetryKey] = "1"
+	} else {
+		kvs[hcDefinition+RetryKey] = "0"
+	}
+	kvs[hcDefinition+RetryTimeKey] = string(gw.hc.RetryTime)
+	err = gw.putMany(kvs)
+	if err != nil {
+		log.Print(err)
+		return err
 	}
 
 	return nil
 }
 
 func (gw *ApiGatewayRegistrant) registerService() error {
-	var kvs map[string][]string
-	kvs = make(map[string][]string)
+	var kvs map[string]string
+	kvs = make(map[string]string)
 
-	resp, err := gw.getKeyValueWithPrefix(fmt.Sprintf(ServiceDefinition, gw.service.Name))
+	serviceDefinition := fmt.Sprintf(ServiceDefinition, gw.service.Name)
+	resp, err := gw.getKeyValueWithPrefix(serviceDefinition)
 	if err != nil {
 		log.Print(err)
 		return err
@@ -250,23 +279,87 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 			return err
 		}
 
-		kvs[fmt.Sprintf(ServiceDefinition, gw.service.Name)] = []string{
-			gw.service.Name,
-			string(nodeSlice),
-		}
+		kvs[serviceDefinition+NameKey] = gw.service.Name
+		kvs[serviceDefinition+NodeKey] = string(nodeSlice)
 	} else {
-		resp, err := gw.getKeyValue(fmt.Sprintf(ServiceDefinition, gw.service.Name) + NodeKey)
+		resp, err := gw.getKeyValue(serviceDefinition + NodeKey)
 		if err != nil {
 			log.Print(err)
 			return err
 		}
 		if resp.Count == 0 {
 			// a ri e na i, impossible!
-			return errors.New(fmt.Sprintf("can not find key: [%s]", fmt.Sprintf(ServiceDefinition, gw.service.Name) + NodeKey))
-		} else {
+			return errors.New(fmt.Sprintf("can not find key: [%s]", serviceDefinition+NodeKey))
+		} else if resp.Count == 1 {
+			var nodeSlice []string
+			err := json.Unmarshal(resp.Kvs[0].Value, &nodeSlice)
+			if err != nil {
+				log.Print(err)
+				return err
+			}
+			s := mapset.NewSet()
+			for _, node := range nodeSlice {
+				s.Add(node)
+			}
+			s.Add(gw.node.ID)
+			nodeByteSlice, err := json.Marshal(s.ToSlice())
 
+			kvs[serviceDefinition+NameKey] = gw.service.Name
+			kvs[serviceDefinition+NodeKey] = string(nodeByteSlice)
 		}
+	}
+	err = gw.putMany(kvs)
+	if err != nil {
+		log.Print(err)
+		return err
 	}
 	return nil
 }
 
+func (gw *ApiGatewayRegistrant) registerRouter() error {
+	for _, r := range gw.router {
+		var kvs map[string]string
+		kvs = make(map[string]string)
+
+		routerName := fmt.Sprintf(RouterDefinition, r.Name)
+		resp, err := gw.getKeyValueWithPrefix(routerName)
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+		if resp.Count == 0 {
+			kvs[routerName + IDKey] = r.ID
+			kvs[routerName + NameKey] = r.Name
+			kvs[routerName + StatusKey] = string(r.Status)
+			kvs[routerName + FrontendKey] = r.Frontend
+			kvs[routerName + BackendKey] = r.Backend
+			kvs[routerName + ServiceKey] = r.Service.Name
+		} else {
+			var flag uint8
+			for _, kv := range resp.Kvs {
+				if bytes.Equal(kv.Key, []byte(routerName + StatusKey)) {
+					if string(kv.Value) != "1" {
+						// router still online, can not be updated
+						flag = 1
+						break
+					}
+				}
+			}
+			if flag == 0 {
+				kvs[routerName + IDKey] = r.ID
+				kvs[routerName + NameKey] = r.Name
+				kvs[routerName + StatusKey] = string(r.Status)
+				kvs[routerName + FrontendKey] = r.Frontend
+				kvs[routerName + BackendKey] = r.Backend
+				kvs[routerName + ServiceKey] = r.Service.Name
+			}
+		}
+		err = gw.putMany(kvs)
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+	}
+
+	return nil
+}

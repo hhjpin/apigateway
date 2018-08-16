@@ -1,16 +1,16 @@
 package golang
 
 import (
-	"testing"
 	"log"
 	"net"
-	"strings"
 	"strconv"
+	"strings"
+	"testing"
 )
 
 func TestApiGatewayRegistrant_Register(t *testing.T) {
 	inter, _ := net.Interfaces()
-	for _, i:= range inter {
+	for _, i := range inter {
 		macStr := i.HardwareAddr.String()
 		if macStr != "" {
 			hexStr := strings.Join(strings.Split(macStr, ":"), "")
@@ -27,4 +27,3 @@ func TestApiGatewayRegistrant_Register(t *testing.T) {
 func ExampleApiGatewayRegistrant_Register() {
 
 }
-

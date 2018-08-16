@@ -1,11 +1,11 @@
 package core
 
 import (
-	"github.com/valyala/fasthttp"
-	"time"
+	"api_gateway/middleware"
 	"api_gateway/utils/errors"
 	"bytes"
-	"api_gateway/middleware"
+	"github.com/valyala/fasthttp"
+	"time"
 )
 
 func MainRequestHandlerWrapper(table *RoutingTable, middle ...*middleware.Middleware) fasthttp.RequestHandler {
@@ -14,10 +14,10 @@ func MainRequestHandlerWrapper(table *RoutingTable, middle ...*middleware.Middle
 			ctx.SetUserValue("RoutingTable", table)
 			ctx.SetUserValue("Middleware", middle)
 			ReverseProxyHandler(ctx)
-	},
-	time.Second * 5,
-	errors.New(5).Error(),
-)
+		},
+		time.Second*5,
+		errors.New(5).Error(),
+	)
 }
 
 func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {

@@ -1,8 +1,8 @@
 package errors
 
 import (
-	"testing"
 	"log"
+	"testing"
 )
 
 func TestNew(t *testing.T) {

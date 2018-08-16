@@ -1,11 +1,11 @@
 package core
 
 import (
-	"github.com/valyala/fasthttp"
-	"bytes"
 	"api_gateway/utils/errors"
-	"log"
+	"bytes"
 	"fmt"
+	"github.com/valyala/fasthttp"
+	"log"
 )
 
 type HealthCheck struct {
@@ -51,7 +51,7 @@ func (h *HealthCheck) Check(host []byte, port uint8) (bool, error) {
 		return true, nil
 	} else {
 		return false, errors.New(61, errors.CustomErrMsg{
-			ErrMsg: fmt.Sprintf("%s 健康检查失败, 返回状态码 [%d]", string(tmpHost),statusCode),
+			ErrMsg:   fmt.Sprintf("%s 健康检查失败, 返回状态码 [%d]", string(tmpHost), statusCode),
 			ErrMsgEn: fmt.Sprintf("%s health check failed, status code [%d]", string(tmpHost), statusCode),
 		})
 	}
