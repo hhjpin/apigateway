@@ -3,11 +3,12 @@ package main
 import (
 	"api_gateway/core"
 	"fmt"
-	"github.com/valyala/fasthttp"
-	"log"
+	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
-	"time"
+	"github.com/valyala/fasthttp"
+	"os"
 	"sync"
+	"time"
 )
 
 type etcdPool struct {
@@ -16,8 +17,10 @@ type etcdPool struct {
 }
 
 var (
-	table *core.RoutingTable
+	table    *core.RoutingTable
 	EtcdPool = etcdPool{}
+
+	eLogger = log.New()
 )
 
 func (p *etcdPool) Load(key string) (cli *clientv3.Client, exists bool) {
@@ -59,7 +62,8 @@ func ConnectToEtcd() *clientv3.Client {
 			},
 		)
 		if err != nil {
-			log.Fatal(err)
+			eLogger.Exception(err)
+			os.Exit(-1)
 		}
 		return cli
 	}
@@ -85,9 +89,10 @@ func main() {
 	}
 
 	host := fmt.Sprintf("%s:%d", Conf.Server.ListenHost, Conf.Server.ListenPort)
-	log.Print(host)
+	eLogger.Info(host)
 	err := server.ListenAndServe(host)
 	if err != nil {
-		log.Fatal(err)
+		eLogger.Exception(err)
+		os.Exit(-1)
 	}
 }

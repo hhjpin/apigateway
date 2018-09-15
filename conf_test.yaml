@@ -35,7 +35,7 @@ Etcd:
   name: "etcd-00"
 
   # Endpoint is a list of URLs
-  Endpoints: []
+  Endpoints: ["127.0.0.1:2379"]
 
   Username: ""
   Password: ""

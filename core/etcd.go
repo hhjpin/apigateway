@@ -1,10 +1,10 @@
 package core
 
 import (
-	"api_gateway/utils/errors"
 	"bytes"
 	"context"
 	"encoding/json"
+	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
 	"log"
 	"runtime"
@@ -70,18 +70,20 @@ func InitRoutingTable(cli *clientv3.Client) *RoutingTable {
 			epSlice = append(epSlice, value)
 		}
 	})
-	for i := 0; i < cpuNum; i++ {
-		go func(eSlice []*Endpoint) {
-			for _, ep := range eSlice {
-				if check, err := ep.healthCheck.Check(ep.host, ep.port); check {
-					ep.setStatus(Online)
-				} else {
-					ep.setStatus(BreakDown)
-					log.SetPrefix("[ERROR]")
-					log.Print(err)
+	if len(epSlice) > 0 {
+		for i := 0; i < cpuNum; i++ {
+			go func(eSlice []*Endpoint) {
+				for _, ep := range eSlice {
+					if check, err := ep.healthCheck.Check(ep.host, ep.port); check {
+						ep.setStatus(Online)
+					} else {
+						ep.setStatus(BreakDown)
+						log.SetPrefix("[ERROR]")
+						log.Print(err)
+					}
 				}
-			}
-		}(epSlice[0 : len(epSlice)-1 : cpuNum])
+			}(epSlice[0 : len(epSlice) - 1 : cpuNum])
+		}
 	}
 	rt.routerTable.Range(func(key RouterNameString, value *Router) {
 		if value.CheckStatus(Online) {
@@ -99,8 +101,8 @@ func InitRoutingTable(cli *clientv3.Client) *RoutingTable {
 }
 
 func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap, error) {
-	var svrMap ServiceTableMap
-	var epMap EndpointTableMap
+	svrMap := NewServiceTableMap()
+	epMap := NewEndpointTableMap()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	resp, err := cli.Get(ctx, ServiceDefinition, clientv3.WithPrefix())
@@ -136,8 +138,14 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 							log.Print(err)
 							return nil, nil, err
 						}
-						if _, ok := s.ep.Load(ep.nameString); !ok {
-							s.ep.Store(ep.nameString, ep)
+						if s.ep != nil {
+							if _, ok := s.ep.Load(ep.nameString); !ok {
+								s.ep.Store(ep.nameString, ep)
+							}
+						} else {
+							epMap := NewEndpointTableMap()
+							epMap.Store(ep.nameString, ep)
+							s.ep = epMap
 						}
 					}
 					s.ep.Range(func(key EndpointNameString, value *Endpoint) {
@@ -162,7 +170,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 					}
 				} else if bytes.Equal(tmp[1], NodeKeyBytes) {
 					var nodeSlice []string
-					var epSlice EndpointTableMap
+					epSlice := NewEndpointTableMap()
 
 					s = &Service{
 						name:       sName,
@@ -183,7 +191,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 						}
 						epSlice.Store(ep.nameString, ep)
 					}
-					s.ep = &epSlice
+					s.ep = epSlice
 					svrMap.Store(s.nameString, s)
 					s.ep.Range(func(key EndpointNameString, value *Endpoint) {
 						epMap.Store(key, value)
@@ -195,7 +203,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 			}
 		}
 	}
-	return &svrMap, &epMap, nil
+	return svrMap, epMap, nil
 }
 
 func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
@@ -312,8 +320,8 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 }
 
 func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap, *ApiRouterTableMap, error) {
-	var rtMap RouterTableMap
-	var artMap ApiRouterTableMap
+	rtMap := NewRouteTableMap()
+	artMap := NewApiRouterTableMap()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	resp, err := cli.Get(ctx, RouterDefinition, clientv3.WithPrefix())
@@ -412,5 +420,5 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 	rtMap.Range(func(key RouterNameString, value *Router) {
 		artMap.Store(value.frontendApi.pathString, value)
 	})
-	return &rtMap, &artMap, nil
+	return rtMap, artMap, nil
 }

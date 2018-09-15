@@ -1,9 +1,9 @@
 package core
 
 import (
-	"api_gateway/utils/errors"
 	"bytes"
 	"fmt"
+	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/valyala/fasthttp"
 	"log"
 )

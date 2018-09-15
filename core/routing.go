@@ -17,12 +17,12 @@ package core
 
 import (
 	"api_gateway/middleware"
-	"api_gateway/utils/errors"
 	"bytes"
 	"container/ring"
+	"git.henghajiang.com/backend/golang_utils/errors"
+	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/deckarep/golang-set"
 	"github.com/golang/time/rate"
-	"log"
 )
 
 const (
@@ -34,6 +34,8 @@ const (
 var (
 	VariableIdentifier = []byte("$")
 	UriSlash           = []byte("/")
+
+	rtLogger = log.New()
 )
 
 type Status uint8
@@ -119,8 +121,7 @@ func (r *RoutingTable) addBackendService(service *Service) (ok bool, err error) 
 
 	_, exists := r.serviceTable.Load(service.nameString)
 	if exists {
-		log.SetPrefix("[INFO]")
-		log.Print("service already exists")
+		rtLogger.Info("service already exists")
 		return false, errors.New(20)
 	}
 	r.serviceTable.Store(service.nameString, service)
@@ -131,8 +132,7 @@ func (r *RoutingTable) removeBackendService(service *Service) (ok bool, err erro
 
 	_, exists := r.serviceTable.Load(service.nameString)
 	if !exists {
-		log.SetPrefix("[INFO]")
-		log.Print("service not exist")
+		rtLogger.Info("service not exist")
 		return false, errors.New(21)
 	}
 	r.serviceTable.Delete(service.nameString)
@@ -143,8 +143,7 @@ func (r *RoutingTable) addBackendEndpoint(ep *Endpoint) (ok bool, err error) {
 
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if exists {
-		log.SetPrefix("[INFO]")
-		log.Print("ep already exists")
+		rtLogger.Info("ep already exists")
 		return false, errors.New(22)
 	}
 	r.endpointTable.Store(ep.nameString, ep)
@@ -155,8 +154,7 @@ func (r *RoutingTable) removeBackendEndpoint(ep *Endpoint) (ok bool, err error) 
 
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if !exists {
-		log.SetPrefix("[INFO]")
-		log.Print("ep not exist")
+		rtLogger.Info("ep not exist")
 		return false, errors.New(23)
 	}
 	r.endpointTable.Delete(ep.nameString)
@@ -223,13 +221,11 @@ func (r *RoutingTable) RemoveFrontendApi(path []byte) (ok bool, err error) {
 
 func (r *RoutingTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *BackendApi, svr *Service, mw ...*middleware.Middleware) error {
 	if fApi.pathString == "" || bApi.pathString == "" {
-		log.SetPrefix("[ERROR]")
-		log.Print("api obj not completed")
+		rtLogger.Error("api obj not completed")
 		return errors.New(26)
 	}
 	if svr.nameString == "" {
-		log.SetPrefix("[ERROR]")
-		log.Print("service obj not completed")
+		rtLogger.Error("service obj not completed")
 		return errors.New(27)
 	}
 
@@ -254,8 +250,7 @@ func (r *RoutingTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *Backen
 				for _, i := range rest {
 					_, e := r.addBackendEndpoint(i)
 					if e != nil {
-						log.SetPrefix("[ERROR]")
-						log.Print("error raised when add endpoint to endpoint-table")
+						rtLogger.Error("error raised when add endpoint to endpoint-table")
 						return errors.New(29)
 					}
 				}
@@ -273,8 +268,7 @@ func (r *RoutingTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *Backen
 func (r *RoutingTable) GetRouterByName(name []byte) (*Router, error) {
 	router, exists := r.routerTable.Load(RouterNameString(name))
 	if !exists {
-		log.SetPrefix("[WARNING]")
-		log.Print("can not find router by name")
+		rtLogger.Warning("can not find router by name")
 		return nil, errors.New(31)
 	}
 	return router, nil
@@ -284,8 +278,7 @@ func (r *RoutingTable) RemoveRouter(router *Router) (ok bool, err error) {
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
-		log.SetPrefix("[WARNING]")
-		log.Print("router not exists")
+		rtLogger.Warning("router not exists")
 		return false, errors.New(25)
 	}
 
@@ -303,8 +296,7 @@ func (r *RoutingTable) SetRouterOnline(router *Router) (ok bool, err error) {
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
-		log.SetPrefix("[WARNING]")
-		log.Print("router not exists")
+		rtLogger.Warning("router not exists")
 		return false, errors.New(25)
 	}
 
@@ -324,8 +316,7 @@ func (r *RoutingTable) SetRouterOnline(router *Router) (ok bool, err error) {
 				for _, i := range rest {
 					_, e := r.addBackendEndpoint(i)
 					if e != nil {
-						log.SetPrefix("[ERROR]")
-						log.Print("error raised when add endpoint to endpoint-table")
+						rtLogger.Error("error raised when add endpoint to endpoint-table")
 						return false, errors.New(34)
 					}
 				}
@@ -352,8 +343,7 @@ func (r *RoutingTable) SetRouterStatus(router *Router, status Status) (ok bool, 
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
-		log.SetPrefix("[WARNING]")
-		log.Print("router not exists")
+		rtLogger.Warning("router not exists")
 		return false, errors.New(25)
 	}
 
@@ -388,8 +378,7 @@ func (r *RoutingTable) GetServiceByName(name []byte) (*Service, error) {
 
 	service, exists := r.serviceTable.Load(ServiceNameString(name))
 	if !exists {
-		log.SetPrefix("[WARNING]")
-		log.Print("can not find service by name")
+		rtLogger.Warning("can not find service by name")
 		return nil, errors.New(37)
 	}
 	return service, nil
@@ -400,8 +389,7 @@ func (r *RoutingTable) RemoveService(svr *Service) error {
 
 	_, exists := r.serviceTable.Load(svr.nameString)
 	if !exists {
-		log.SetPrefix("[WARNING]")
-		log.Print("can not find service by name")
+		rtLogger.Warning("can not find service by name")
 		return errors.New(37)
 	}
 
@@ -452,8 +440,7 @@ func (r *RoutingTable) GetEndpointByName(name EndpointNameString) (*Endpoint, er
 	if exists {
 		return endpoint, nil
 	} else {
-		log.SetPrefix("[WARNING]")
-		log.Print("can not find endpoint by name")
+		rtLogger.Warning("can not find endpoint by name")
 		return nil, errors.New(39)
 	}
 }
@@ -461,8 +448,7 @@ func (r *RoutingTable) GetEndpointByName(name EndpointNameString) (*Endpoint, er
 func (r *RoutingTable) SetEndpointOnline(ep *Endpoint) error {
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if !exists {
-		log.SetPrefix("[WARNING]")
-		log.Print("endpoint not exists")
+		rtLogger.Warning("endpoint not exists")
 		return errors.New(39)
 	}
 	ep.setStatus(Online)
@@ -473,8 +459,7 @@ func (r *RoutingTable) RemoveEndpoint(svr *Endpoint) error {
 
 	_, exists := r.endpointTable.Load(svr.nameString)
 	if !exists {
-		log.SetPrefix("[WARNING]")
-		log.Print("can not find endpoint by name")
+		rtLogger.Warning("can not find endpoint by name")
 		return errors.New(39)
 	}
 

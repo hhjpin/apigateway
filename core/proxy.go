@@ -2,10 +2,15 @@ package core
 
 import (
 	"api_gateway/middleware"
-	"api_gateway/utils/errors"
 	"bytes"
+	"git.henghajiang.com/backend/golang_utils/errors"
+	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/valyala/fasthttp"
 	"time"
+)
+
+var (
+	proxyLogger = log.New()
 )
 
 func MainRequestHandlerWrapper(table *RoutingTable, middle ...*middleware.Middleware) fasthttp.RequestHandler {
@@ -23,22 +28,21 @@ func MainRequestHandlerWrapper(table *RoutingTable, middle ...*middleware.Middle
 func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 
 	path := ctx.Path()
-	logger := ctx.Logger()
 	routingTable := ctx.UserValue("RoutingTable")
 	if routingTable == nil {
-		logger.Printf("Routing Table not exists")
+		proxyLogger.Error("Routing Table not exists")
 		ctx.Error(errors.New(7).MarshalString(), fasthttp.StatusInternalServerError)
 	}
 
 	rt, ok := routingTable.(*RoutingTable)
 	if !ok {
-		logger.Printf("wrong type of Routing Table")
+		proxyLogger.Error("wrong type of Routing Table")
 		ctx.Error(errors.New(7).MarshalString(), fasthttp.StatusInternalServerError)
 	}
 
 	target, err := rt.Select(path)
 	if err != nil {
-		logger.Printf(err.Error())
+		proxyLogger.Exception(err)
 		ctx.Error(err.(errors.Error).MarshalString(), fasthttp.StatusInternalServerError)
 	}
 
@@ -66,7 +70,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		revReqUri.SetQueryStringBytes(queryString)
 	}
 	revReq.SetRequestURIBytes(revReqUri.FullURI())
-	logger.Printf("reverse request header: %+v", revReq.Header)
+	proxyLogger.Infof("reverse request header: %+v", revReq.Header)
 
 	if body := ctx.Request.Body(); len(body) > 0 {
 		revReq.SetBody(body)
@@ -74,7 +78,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 
 	err = fasthttp.Do(revReq, revRes)
 	if err != nil {
-		logger.Printf("http client raised an error: %+v", err)
+		proxyLogger.Exception(err)
 	}
 	ctx.SetBody(revRes.Body())
 }
