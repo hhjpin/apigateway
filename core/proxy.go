@@ -65,12 +65,12 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	revReqUri.SetHostBytes(target.host)
 	revReqUri.SetPathBytes(target.uri)
 	revReqUri.SetScheme("http")
+	revReq.Header.SetMethodBytes(ctx.Request.Header.Method())
 
 	if queryString := ctx.QueryArgs().QueryString(); len(queryString) > 0 {
 		revReqUri.SetQueryStringBytes(queryString)
 	}
 	revReq.SetRequestURIBytes(revReqUri.FullURI())
-	proxyLogger.Infof("reverse request header: %+v", revReq.Header)
 
 	if body := ctx.Request.Body(); len(body) > 0 {
 		revReq.SetBody(body)
@@ -80,5 +80,13 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	if err != nil {
 		proxyLogger.Exception(err)
 	}
+	revRes.Header.VisitAll(func(key, value []byte) {
+		if bytes.Equal(key, strHost) {
+			// pass
+		} else {
+			ctx.Response.Header.AppendBytes(value)
+		}
+	})
+	ctx.Response.SetStatusCode(revRes.StatusCode())
 	ctx.SetBody(revRes.Body())
 }

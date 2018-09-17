@@ -5,9 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"git.henghajiang.com/backend/golang_utils/errors"
+	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
-	"log"
-	"runtime"
 	"strconv"
 	"time"
 )
@@ -42,25 +41,36 @@ var (
 	RetryTimeKeyBytes      = []byte("RetryTime")
 	RouterDefinitionBytes  = []byte("/Router/")
 	ServiceDefinitionBytes = []byte("/Service/")
+
+	etcdLogger = log.New()
 )
 
+func RouterWatcher(watchChannel clientv3.WatchChan) {
+	for {
+		resp := <- watchChannel
+		for _, i := range resp.Events {
+			etcdLogger.Info(i)
+		}
+
+	}
+}
+
 func InitRoutingTable(cli *clientv3.Client) *RoutingTable {
-	var cpuNum int
 	var rt RoutingTable
 	var epSlice []*Endpoint
-	cpuNum = runtime.NumCPU()
 
 	rt.Version = "1.0.0"
+	ol := NewOnlineRouteTableMap()
 	svrMap, epMap, err := initServiceNode(cli)
 	if err != nil {
-		log.Fatal(err)
+		etcdLogger.Exception(err)
 	}
 	rt.serviceTable = *svrMap
 	rt.endpointTable = *epMap
 
 	routerTable, table, err := initRouter(cli, &rt.serviceTable)
 	if err != nil {
-		log.Fatal(err)
+		etcdLogger.Exception(err)
 	}
 	rt.table = *table
 	rt.routerTable = *routerTable
@@ -71,31 +81,28 @@ func InitRoutingTable(cli *clientv3.Client) *RoutingTable {
 		}
 	})
 	if len(epSlice) > 0 {
-		for i := 0; i < cpuNum; i++ {
-			go func(eSlice []*Endpoint) {
-				for _, ep := range eSlice {
-					if check, err := ep.healthCheck.Check(ep.host, ep.port); check {
-						ep.setStatus(Online)
-					} else {
-						ep.setStatus(BreakDown)
-						log.SetPrefix("[ERROR]")
-						log.Print(err)
-					}
-				}
-			}(epSlice[0 : len(epSlice) - 1 : cpuNum])
+		for _, ep := range epSlice {
+			if check, err := ep.healthCheck.Check(ep.host, ep.port); check {
+				ep.setStatus(Online)
+			} else {
+				ep.setStatus(BreakDown)
+				etcdLogger.Exception(err)
+			}
 		}
 	}
 	rt.routerTable.Range(func(key RouterNameString, value *Router) {
 		if value.CheckStatus(Online) {
 			value.setStatus(Online)
+			ol.Store(value.frontendApi, value)
 		} else {
 			value.setStatus(Offline)
 		}
 		confirm, _ := value.service.checkEndpointStatus(Online)
 		if err := value.service.ResetOnlineEndpointRing(confirm); err != nil {
-			log.Print(err)
+			etcdLogger.Exception(err)
 		}
 	})
+	rt.onlineTable = *ol
 
 	return &rt
 }
@@ -108,13 +115,13 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 	resp, err := cli.Get(ctx, ServiceDefinition, clientv3.WithPrefix())
 	cancel()
 	if err != nil {
-		log.Fatal(err)
+		etcdLogger.Exception(err)
 	}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, ServiceDefinitionBytes)
 		tmp := bytes.Split(key, SlashBytes)
 		if len(tmp) != 2 {
-			log.Printf("invalid service definition: %s", key)
+			etcdLogger.Infof("invalid service definition: %s", key)
 			continue
 		} else {
 			sName := bytes.TrimPrefix(tmp[0], ServicePrefixBytes)
@@ -129,13 +136,13 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 
 					err = json.Unmarshal(kv.Value, &nodeSlice)
 					if err != nil {
-						log.Print(err)
+						etcdLogger.Exception(err)
 						return nil, nil, err
 					}
 					for _, n := range nodeSlice {
 						ep, err := initEndpointNode(cli, n)
 						if err != nil {
-							log.Print(err)
+							etcdLogger.Exception(err)
 							return nil, nil, err
 						}
 						if s.ep != nil {
@@ -152,8 +159,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 						epMap.Store(key, value)
 					})
 				} else {
-					log.SetPrefix("[WARNING]")
-					log.Printf("unrecognized node attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
+					etcdLogger.Warningf("unrecognized node attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
 				}
 			} else {
 				if bytes.Equal(tmp[1], NameKeyBytes) {
@@ -166,7 +172,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 						}
 						svrMap.Store(ServiceNameString(sName), s)
 					} else {
-						log.Printf("invalid service name, key: %s", string(kv.Key))
+						etcdLogger.Infof("invalid service name, key: %s", string(kv.Key))
 					}
 				} else if bytes.Equal(tmp[1], NodeKeyBytes) {
 					var nodeSlice []string
@@ -180,13 +186,13 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 					}
 					err = json.Unmarshal(kv.Value, &nodeSlice)
 					if err != nil {
-						log.Print(err)
+						etcdLogger.Exception(err)
 						return nil, nil, err
 					}
 					for _, n := range nodeSlice {
 						ep, err := initEndpointNode(cli, n)
 						if err != nil {
-							log.Print(err)
+							etcdLogger.Exception(err)
 							return nil, nil, err
 						}
 						epSlice.Store(ep.nameString, ep)
@@ -197,8 +203,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 						epMap.Store(key, value)
 					})
 				} else {
-					log.SetPrefix("[WARNING]")
-					log.Printf("unrecognized node attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
+					etcdLogger.Warningf("unrecognized node attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
 				}
 			}
 		}
@@ -213,7 +218,7 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 	resp, err := cli.Get(ctx, NodePrefixDefinition+nodeID, clientv3.WithPrefix())
 	cancel()
 	if err != nil {
-		log.Print(err)
+		etcdLogger.Exception(err)
 		return nil, err
 	}
 	for _, kv := range resp.Kvs {
@@ -228,14 +233,14 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 		} else if bytes.Equal(key, PortKeyBytes) {
 			tmpInt, err := strconv.ParseUint(string(kv.Value), 10, 64)
 			if err != nil {
-				log.Print(err)
+				etcdLogger.Exception(err)
 				return nil, err
 			}
-			ep.port = uint8(tmpInt)
+			ep.port = int(tmpInt)
 		} else if bytes.Equal(key, StatusKeyBytes) {
 			tmpInt, err := strconv.ParseUint(string(kv.Value), 10, 64)
 			if err != nil {
-				log.Print(err)
+				etcdLogger.Exception(err)
 				return nil, err
 			}
 			switch Status(uint8(tmpInt)) {
@@ -246,7 +251,7 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 			case BreakDown:
 				ep.status = BreakDown
 			default:
-				return nil, errors.New(50)
+				return nil, errors.New(150)
 			}
 		} else if bytes.Equal(key, HealthCheckKeyBytes) {
 			// get health check info
@@ -254,7 +259,7 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 			respA, err := cli.Get(ctxA, HealthCheckPrefixDefinition+string(kv.Value), clientv3.WithPrefix())
 			cancelA()
 			if err != nil {
-				log.Print(err)
+				etcdLogger.Exception(err)
 				return nil, err
 			}
 
@@ -269,21 +274,21 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 				} else if bytes.Equal(keyA, TimeoutKeyBytes) {
 					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
-						log.Print(err)
+						etcdLogger.Exception(err)
 						return nil, err
 					}
 					hc.timeout = uint8(tmpInt)
 				} else if bytes.Equal(keyA, IntervalKeyBytes) {
 					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
-						log.Print(err)
+						etcdLogger.Exception(err)
 						return nil, err
 					}
 					hc.interval = uint8(tmpInt)
 				} else if bytes.Equal(keyA, RetryKeyBytes) {
 					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
-						log.Print(err)
+						etcdLogger.Exception(err)
 						return nil, err
 					}
 					if tmpInt == 0 {
@@ -294,27 +299,24 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 				} else if bytes.Equal(keyA, RetryTimeKeyBytes) {
 					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
-						log.Print(err)
+						etcdLogger.Exception(err)
 						return nil, err
 					}
 					hc.retryTime = uint8(tmpInt)
 				} else {
 					// unrecognized attribute
-					log.SetPrefix("[WARNING]")
-					log.Printf("unrecognized health check attribute\n\tkey: %s\n\tvalue: %s", string(kvA.Key), string(kvA.Value))
+					etcdLogger.Warningf("unrecognized health check attribute\n\tkey: %s\n\tvalue: %s", string(kvA.Key), string(kvA.Value))
 				}
 			}
 			ep.healthCheck = &hc
 		} else {
-			log.SetPrefix("[WARNING]")
-			log.Printf("unrecognized node attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
+			etcdLogger.Warningf("unrecognized node attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
 		}
 	}
 
 	if ep.nameString == "" || ep.host == nil || ep.port == 0 {
-		log.SetPrefix("[ERROR]")
-		log.Printf("endpoint initialized failed. uncompleted attribute assigned. %+v", ep)
-		return nil, errors.New(51)
+		etcdLogger.Errorf("endpoint initialized failed. uncompleted attribute assigned. %+v", ep)
+		return nil, errors.New(151)
 	}
 	return &ep, nil
 }
@@ -327,15 +329,14 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 	resp, err := cli.Get(ctx, RouterDefinition, clientv3.WithPrefix())
 	cancel()
 	if err != nil {
-		log.Print(err)
+		etcdLogger.Exception(err)
 		return nil, nil, err
 	}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, RouterDefinitionBytes)
 		tmpSlice := bytes.Split(key, SlashBytes)
 		if len(tmpSlice) != 2 {
-			log.SetPrefix("[WARNING]")
-			log.Printf("invalid router definition: %s", key)
+			etcdLogger.Warningf("invalid router definition: %s", key)
 			continue
 		} else {
 			rName := bytes.TrimPrefix(tmpSlice[0], RouterPrefixBytes)
@@ -345,8 +346,7 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 					// do nothing
 				} else if bytes.Equal(attr, NameKeyBytes) {
 					if !bytes.Equal(rName, kv.Value) {
-						log.SetPrefix("[WARNING]")
-						log.Printf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
+						etcdLogger.Warningf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
 						continue
 					}
 				} else if bytes.Equal(attr, FrontendApiKeyBytes) {
@@ -365,53 +365,48 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 					if svr, ok := svrMap.Load(ServiceNameString(kv.Value)); ok {
 						r.service = svr
 					} else {
-						log.SetPrefix("[ERROR]")
-						log.Print("service not exist")
+						etcdLogger.Errorf("service not exist")
 						continue
 					}
 				} else {
-					log.SetPrefix("[WARNING]")
-					log.Printf("unrecognized health check attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
+					etcdLogger.Warningf("unrecognized health check attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
 				}
 			} else {
-				r := Router{}
+				tmpRouter := Router{}
 				if bytes.Equal(attr, IdKeyBytes) {
 					// do nothing
 				} else if bytes.Equal(attr, NameKeyBytes) {
 					if !bytes.Equal(rName, kv.Value) {
-						log.SetPrefix("[WARNING]")
-						log.Printf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
+						etcdLogger.Warningf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
 						continue
 					} else {
-						r.name = rName
+						tmpRouter.name = rName
 					}
-					rtMap.Store(RouterNameString(r.name), &r)
+					rtMap.Store(RouterNameString(rName), &tmpRouter)
 				} else if bytes.Equal(attr, FrontendApiKeyBytes) {
-					r.frontendApi = &FrontendApi{
+					tmpRouter.frontendApi = &FrontendApi{
 						path:       kv.Value,
 						pathString: FrontendApiString(kv.Value),
 						pattern:    bytes.Split(kv.Value, SlashBytes),
 					}
-					rtMap.Store(RouterNameString(r.name), &r)
+					rtMap.Store(RouterNameString(rName), &tmpRouter)
 				} else if bytes.Equal(attr, BackendApiKeyBytes) {
-					r.backendApi = &BackendApi{
+					tmpRouter.backendApi = &BackendApi{
 						path:       kv.Value,
 						pathString: BackendApiString(kv.Value),
 						pattern:    bytes.Split(kv.Value, SlashBytes),
 					}
-					rtMap.Store(RouterNameString(r.name), &r)
+					rtMap.Store(RouterNameString(rName), &tmpRouter)
 				} else if bytes.Equal(attr, ServiceKeyBytes) {
 					if svr, ok := svrMap.Load(ServiceNameString(kv.Value)); ok {
-						r.service = svr
-						rtMap.Store(RouterNameString(r.name), &r)
+						tmpRouter.service = svr
+						rtMap.Store(RouterNameString(rName), &tmpRouter)
 					} else {
-						log.SetPrefix("[ERROR]")
-						log.Print("service not exist")
+						etcdLogger.Error("service not exist")
 						continue
 					}
 				} else {
-					log.SetPrefix("[WARNING]")
-					log.Printf("unrecognized health check attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
+					etcdLogger.Warningf("unrecognized health check attribute\n\tkey: %s\n\tvalue: %s", string(kv.Key), string(kv.Value))
 				}
 			}
 		}

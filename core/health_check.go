@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"git.henghajiang.com/backend/golang_utils/errors"
+	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/valyala/fasthttp"
-	"log"
+	"strconv"
 )
 
 type HealthCheck struct {
@@ -20,11 +21,13 @@ type HealthCheck struct {
 
 var (
 	GetMethod = []byte("GET")
+
+	hcLogger = log.New()
 )
 
-func (h *HealthCheck) Check(host []byte, port uint8) (bool, error) {
+func (h *HealthCheck) Check(host []byte, port int) (bool, error) {
 	if h.path == nil {
-		return false, errors.New(60)
+		return false, errors.New(160)
 	}
 	revReq := fasthttp.AcquireRequest()
 	revReqUri := fasthttp.AcquireURI()
@@ -34,7 +37,7 @@ func (h *HealthCheck) Check(host []byte, port uint8) (bool, error) {
 	defer fasthttp.ReleaseResponse(revRes)
 	defer fasthttp.ReleaseURI(revReqUri)
 
-	tmpHost := bytes.Join([][]byte{host, []byte(string(port))}, []byte(":"))
+	tmpHost := bytes.Join([][]byte{host, []byte(strconv.FormatInt(int64(port), 10))}, []byte(":"))
 	revReqUri.SetHostBytes(tmpHost)
 	revReqUri.SetPathBytes(h.path)
 	revReqUri.SetScheme("http")
@@ -44,13 +47,13 @@ func (h *HealthCheck) Check(host []byte, port uint8) (bool, error) {
 
 	err := fasthttp.Do(revReq, revRes)
 	if err != nil {
-		log.Print(err)
-		return false, errors.New(61)
+		hcLogger.Exception(err)
+		return false, errors.New(161)
 	}
 	if statusCode := revRes.StatusCode(); statusCode >= 200 && statusCode < 400 {
 		return true, nil
 	} else {
-		return false, errors.New(61, errors.CustomErrMsg{
+		return false, errors.New(161, errors.CustomErrMsg{
 			ErrMsg:   fmt.Sprintf("%s 健康检查失败, 返回状态码 [%d]", string(tmpHost), statusCode),
 			ErrMsgEn: fmt.Sprintf("%s health check failed, status code [%d]", string(tmpHost), statusCode),
 		})

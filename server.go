@@ -2,6 +2,7 @@ package main
 
 import (
 	"api_gateway/core"
+	"context"
 	"fmt"
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
@@ -70,7 +71,13 @@ func ConnectToEtcd() *clientv3.Client {
 }
 
 func init() {
-	table = core.InitRoutingTable(ConnectToEtcd())
+	etcdCli := ConnectToEtcd()
+	table = core.InitRoutingTable(etcdCli)
+
+	ctx := context.Background()
+	ch := etcdCli.Watch(ctx, "/Router", clientv3.WithPrefix())
+
+	go core.RouterWatcher(ch)
 }
 
 func main() {

@@ -29,7 +29,7 @@ func init() {
 		node,
 		svr,
 		[]*golang.Router{
-			golang.NewRouter("test", "/front_test", "/test", svr),
+			golang.NewRouter("test1", "/front/$1", "/test/$1", svr),
 			golang.NewRouter("test2", "/api/v1/test", "/test", svr),
 		},
 	)
@@ -57,10 +57,11 @@ func main() {
 
 
 	r := gin.New()
-	r.Use()
+	r.Use(gin.Logger())
 
-	r.POST("/test", func(c *gin.Context) {
-		c.JSON(200, map[string]string{"result": "success"})
+	r.POST("/test/:test_id", func(c *gin.Context) {
+		param := c.Param("test_id")
+		c.JSON(200, map[string]string{"result": "success", "test_id": param})
 	})
 	r.GET("/check", func(c *gin.Context) {
 		c.JSON(200, map[string]string{"result": "success"})
