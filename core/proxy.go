@@ -13,12 +13,28 @@ var (
 	proxyLogger = log.New()
 )
 
-func MainRequestHandlerWrapper(table *RoutingTable, middle ...*middleware.Middleware) fasthttp.RequestHandler {
+func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middleware) fasthttp.RequestHandler {
 	return fasthttp.TimeoutHandler(
 		func(ctx *fasthttp.RequestCtx) {
 			ctx.SetUserValue("RoutingTable", table)
-			ctx.SetUserValue("Middleware", middle)
+			if len(middle) > 0 {
+				for _, m := range middle {
+					if err:= m.Work(ctx); err != nil {
+						ctx.Response.SetStatusCode(fasthttp.StatusOK)
+						ctx.Response.Header.Set("Server", "Api Gateway")
+						ctx.Response.Header.SetContentTypeBytes(strApplicationJson)
+						if e, ok := err.(errors.Error); ok {
+							ctx.Response.SetBody(e.MarshalEmptyData())
+							return
+						} else {
+							ctx.Response.SetBody(errors.New(1).MarshalEmptyData())
+							return
+						}
+					}
+				}
+			}
 			ReverseProxyHandler(ctx)
+			return
 		},
 		time.Second*5,
 		errors.New(5).Error(),

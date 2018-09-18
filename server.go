@@ -2,6 +2,7 @@ package main
 
 import (
 	"api_gateway/core"
+	"api_gateway/middleware"
 	"context"
 	"fmt"
 	"git.henghajiang.com/backend/golang_utils/log"
@@ -84,7 +85,7 @@ func main() {
 	var server *fasthttp.Server
 
 	server = &fasthttp.Server{
-		Handler: core.MainRequestHandlerWrapper(table),
+		Handler: core.MainRequestHandlerWrapper(table, middleware.Limiter),
 
 		Name:               Conf.Server.Name,
 		Concurrency:        Conf.Server.Concurrency,
