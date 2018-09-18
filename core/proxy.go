@@ -18,17 +18,32 @@ func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middlew
 		func(ctx *fasthttp.RequestCtx) {
 			ctx.SetUserValue("RoutingTable", table)
 			if len(middle) > 0 {
+				errChan := make(chan error, len(middle))
 				for _, m := range middle {
-					if err:= m.Work(ctx); err != nil {
+					go m.Work(ctx, errChan)
+				}
+				timer := time.NewTimer(1 * time.Second)
+				for i := 0; i < len(middle); i++ {
+					timer.Reset(1 * time.Second)
+					select {
+					case <- timer.C:
 						ctx.Response.SetStatusCode(fasthttp.StatusOK)
 						ctx.Response.Header.Set("Server", "Api Gateway")
 						ctx.Response.Header.SetContentTypeBytes(strApplicationJson)
-						if e, ok := err.(errors.Error); ok {
-							ctx.Response.SetBody(e.MarshalEmptyData())
-							return
-						} else {
-							ctx.Response.SetBody(errors.New(1).MarshalEmptyData())
-							return
+						ctx.Response.SetBody(errors.New(5).MarshalEmptyData())
+						return
+					case e := <- errChan:
+						if e != nil {
+							ctx.Response.SetStatusCode(fasthttp.StatusOK)
+							ctx.Response.Header.Set("Server", "Api Gateway")
+							ctx.Response.Header.SetContentTypeBytes(strApplicationJson)
+							if err, ok := e.(errors.Error); ok {
+								ctx.Response.SetBody(err.MarshalEmptyData())
+								return
+							} else {
+								ctx.Response.SetBody(errors.New(1).MarshalEmptyData())
+								return
+							}
 						}
 					}
 				}

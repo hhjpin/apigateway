@@ -37,16 +37,18 @@ func init() {
 	go Limiter.consuming()
 }
 
-func (l *limiter) Work(ctx *fasthttp.RequestCtx) error {
+func (l *limiter) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 	remoteIP := ctx.RemoteIP().String()
 	ch <- remoteIP
 	burst := l.Burst(remoteIP)
 	limitLogger.Debugf("frequency control info push into queue: %s", remoteIP)
 	limitLogger.Debugf("remote ip request burst: %d, limit: %d", burst, l.limit)
 	if burst >= l.limit {
-		return errors.New(10)
+		errChan <- errors.New(10)
+	} else {
+		errChan <- nil
 	}
-	return nil
+	return
 }
 
 func (l *limiter) run() {
