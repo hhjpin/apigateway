@@ -116,6 +116,7 @@ type Router struct {
 type TargetServer struct {
 	host []byte
 	uri  []byte
+	svr  []byte
 }
 
 func (r *RoutingTable) addBackendService(service *Service) (ok bool, err error) {
@@ -643,6 +644,7 @@ func (r *RoutingTable) Select(input []byte) (TargetServer, error) {
 			return TargetServer{
 				host: bytes.Join([][]byte{ep.host, []byte(strconv.FormatInt(int64(ep.port), 10))}, []byte(":")),
 				uri:  replacedBackendUri,
+				svr:  matchRouter.service.name,
 			}, nil
 		}
 		ringLength = matchRouter.service.onlineEp.Len()
@@ -675,6 +677,10 @@ func match(input, pattern [][]byte, backend [][]byte) (bool, []byte) {
 		for i := 0; i < patternLen; i++ {
 			if bytes.HasPrefix(pattern[i], VariableIdentifier) {
 				replaced[string(pattern[i])] = input[i]
+			} else {
+				if !bytes.Equal(pattern[i], input[i]) {
+					return false, nil
+				}
 			}
 		}
 		for _, b := range backend {

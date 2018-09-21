@@ -17,4 +17,3 @@ func TestRateLimit(t *testing.T) {
 	}
 	l.Limit()
 }
-

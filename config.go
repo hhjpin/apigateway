@@ -44,6 +44,32 @@ type Config struct {
 		DialKeepAliveTime    int `yaml:"DialKeepAliveTime"`
 		DialKeepAliveTimeout int `yaml:"DialKeepAliveTimeout"`
 	} `yaml:"Etcd"`
+
+	Limiter struct {
+		DefaultLimit            int `yaml:"DefaultLimit"`
+		DefaultConsumePerPeriod int `yaml:"DefaultConsumePerPeriod"`
+		DefaultConsumePeriod    int `yaml:"DefaultConsumePeriod"`
+		LimiterChanLength       int `yaml:"LimiterChanLength"`
+
+		DefaultBlackList []struct {
+			IP        string `yaml:"IP"`
+			Limit     int    `yaml:"Limit"`
+			ExpiresAt int64  `yaml:"ExpiresAt"`
+		} `yaml:"DefaultBlackList"`
+	} `yaml:"Limiter"`
+
+	Counter struct {
+		ShardNumber int `yaml:"ShardNumber"`
+		PersistencePeriod int `yaml:"PersistencePeriod"`
+	} `yaml:"Counter"`
+
+	Auth struct {
+		Redis struct {
+			Addr string `yaml:"Addr"`
+			Password string `yaml:"Password"`
+			Database string `yaml:"Database"`
+		} `yaml:"Redis"`
+	} `yaml:"Auth"`
 }
 
 var (

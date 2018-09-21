@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"time"
 )
+
 var (
 	flagPort = flag.Int("port", 7788, "server listening port")
 )
@@ -31,6 +32,7 @@ func init() {
 		[]*golang.Router{
 			golang.NewRouter("test1", "/front/$1", "/test/$1", svr),
 			golang.NewRouter("test2", "/api/v1/test", "/test", svr),
+			golang.NewRouter("test3", "/rd", "/redirect", svr),
 		},
 	)
 	gw.Register()
@@ -55,7 +57,6 @@ func main() {
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-
 	r := gin.New()
 	r.Use(gin.Logger())
 
@@ -65,6 +66,9 @@ func main() {
 	})
 	r.GET("/check", func(c *gin.Context) {
 		c.JSON(200, map[string]string{"result": "success"})
+	})
+	r.POST("/redirect", func(c *gin.Context) {
+		c.Redirect(308, "http://127.0.0.1/test/redirect")
 	})
 
 	r.Run(fmt.Sprintf(":%d", *flagPort))

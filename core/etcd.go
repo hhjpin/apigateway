@@ -47,7 +47,7 @@ var (
 
 func RouterWatcher(watchChannel clientv3.WatchChan) {
 	for {
-		resp := <- watchChannel
+		resp := <-watchChannel
 		for _, i := range resp.Events {
 			etcdLogger.Info(i)
 		}

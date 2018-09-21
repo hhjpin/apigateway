@@ -11,12 +11,16 @@ import (
 type CountChan chan string
 
 type limiter struct {
-	limit uint64
-	consume uint64
+	limit    uint64
+	consume  uint64
 	interval int64
 
 	sync.RWMutex
-	internal map[string]uint64
+	internal  map[string]uint64
+	blackList map[string]*struct {
+		limit     uint64
+		expiresAt int64
+	}
 }
 
 var (
@@ -25,8 +29,12 @@ var (
 		consume:  1,
 		interval: 5,
 		internal: map[string]uint64{},
+		blackList: map[string]*struct {
+			limit     uint64
+			expiresAt int64
+		}{},
 	}
-	ch = make(CountChan, 1000)
+	limitCh     = make(CountChan, 1000)
 	limitLogger = log.New()
 )
 
@@ -37,22 +45,61 @@ func init() {
 	go Limiter.consuming()
 }
 
+func (l *limiter) SetBlackList(ip string, limit uint64, expiresAt int64) {
+	l.Lock()
+	if b, ok := l.blackList[ip]; ok {
+		b.limit = limit
+		b.expiresAt = expiresAt
+	} else {
+		l.blackList[ip] = &struct {
+			limit     uint64
+			expiresAt int64
+		}{
+			limit:     limit,
+			expiresAt: expiresAt,
+		}
+	}
+	l.Unlock()
+}
+
+func (l *limiter) VerifyBlackList(ip string) (uint64, bool) {
+	l.RLock()
+	defer l.RUnlock()
+	b, ok := l.blackList[ip]
+	if ok {
+		if time.Now().Unix() < b.expiresAt {
+			return b.limit, true
+		} else {
+			return 0, false
+		}
+	} else {
+		return 0, false
+	}
+}
+
 func (l *limiter) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 	remoteIP := ctx.RemoteIP().String()
-	ch <- remoteIP
+	limitCh <- remoteIP
 	burst := l.Burst(remoteIP)
-	limitLogger.Debugf("frequency control info push into queue: %s", remoteIP)
-	limitLogger.Debugf("remote ip request burst: %d, limit: %d", burst, l.limit)
-	if burst >= l.limit {
-		errChan <- errors.New(10)
+	black, exists := l.VerifyBlackList(remoteIP)
+	if exists {
+		limitLogger.Debugf("ip %s in blacklist, limit: %d", remoteIP, black)
+		if burst >= black {
+			errChan <- errors.NewFormat(11, "请联系客服解除封禁限制")
+		}
 	} else {
-		errChan <- nil
+		limitLogger.Debugf("remote ip request burst: %d, limit: %d", burst, l.limit)
+		if burst >= l.limit {
+			errChan <- errors.New(10)
+		} else {
+			errChan <- nil
+		}
 	}
 	return
 }
 
 func (l *limiter) run() {
-	for rec := range ch{
+	for rec := range limitCh {
 		l.Lock()
 		if c, ok := l.internal[rec]; ok {
 			if c < l.limit {
@@ -73,6 +120,11 @@ func (l *limiter) consuming() {
 				delete(l.internal, k)
 			} else {
 				l.internal[k] = v - l.consume
+			}
+		}
+		for k, v := range l.blackList {
+			if time.Now().Unix() > v.expiresAt {
+				delete(l.blackList, k)
 			}
 		}
 		l.Unlock()

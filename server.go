@@ -83,7 +83,6 @@ func init() {
 
 func main() {
 	var server *fasthttp.Server
-
 	server = &fasthttp.Server{
 		Handler: core.MainRequestHandlerWrapper(table, middleware.Limiter),
 

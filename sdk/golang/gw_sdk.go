@@ -234,27 +234,27 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 		for _, kv := range resp.Kvs {
 			if bytes.Equal(kv.Key, []byte(nodeDefinition+StatusKey)) {
 				// pass
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition + IDKey)) {
+			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+IDKey)) {
 				if !bytes.Equal(kv.Value, []byte(n.ID)) {
 					kvs[nodeDefinition+IDKey] = n.ID
 				}
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition + NameKey)) {
+			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+NameKey)) {
 				if !bytes.Equal(kv.Value, []byte(n.Name)) {
 					kvs[nodeDefinition+NameKey] = n.Name
 				}
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition + StatusKey)) {
+			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+StatusKey)) {
 				if !bytes.Equal(kv.Value, []byte(strconv.FormatUint(uint64(n.Status), 10))) {
 					kvs[nodeDefinition+StatusKey] = strconv.FormatUint(uint64(n.Status), 10)
 				}
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition + HostKey)) {
+			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+HostKey)) {
 				if !bytes.Equal(kv.Value, []byte(n.Host)) {
 					kvs[nodeDefinition+HostKey] = n.Host
 				}
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition + PortKey)) {
+			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+PortKey)) {
 				if !bytes.Equal(kv.Value, []byte(strconv.FormatInt(int64(n.Port), 10))) {
 					kvs[nodeDefinition+BackendKey] = strconv.FormatInt(int64(n.Port), 10)
 				}
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition + HealthCheckKey)) {
+			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+HealthCheckKey)) {
 				if !bytes.Equal(kv.Value, []byte(n.HC.ID)) {
 					kvs[nodeDefinition+ServiceKey] = n.HC.ID
 				}
@@ -295,23 +295,23 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 		for _, kv := range resp.Kvs {
 			if bytes.Equal(kv.Key, []byte(hcDefinition+StatusKey)) {
 				// pass
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition + IDKey)) {
+			} else if bytes.Equal(kv.Key, []byte(hcDefinition+IDKey)) {
 				if !bytes.Equal(kv.Value, []byte(hc.ID)) {
 					kvs[hcDefinition+IDKey] = hc.ID
 				}
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition + PathKey)) {
+			} else if bytes.Equal(kv.Key, []byte(hcDefinition+PathKey)) {
 				if !bytes.Equal(kv.Value, []byte(hc.Path)) {
 					kvs[hcDefinition+PathKey] = hc.Path
 				}
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition + TimeoutKey)) {
+			} else if bytes.Equal(kv.Key, []byte(hcDefinition+TimeoutKey)) {
 				if !bytes.Equal(kv.Value, []byte(strconv.FormatUint(uint64(hc.Timeout), 10))) {
 					kvs[hcDefinition+TimeoutKey] = strconv.FormatUint(uint64(hc.Timeout), 10)
 				}
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition + IntervalKey)) {
+			} else if bytes.Equal(kv.Key, []byte(hcDefinition+IntervalKey)) {
 				if !bytes.Equal(kv.Value, []byte(strconv.FormatUint(uint64(hc.Interval), 10))) {
 					kvs[hcDefinition+IntervalKey] = strconv.FormatUint(uint64(hc.Interval), 10)
 				}
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition + RetryKey)) {
+			} else if bytes.Equal(kv.Key, []byte(hcDefinition+RetryKey)) {
 				var retry string
 				if hc.Retry {
 					retry = "1"
@@ -321,7 +321,7 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 				if !bytes.Equal(kv.Value, []byte(retry)) {
 					kvs[hcDefinition+RetryKey] = retry
 				}
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition + RetryTimeKey)) {
+			} else if bytes.Equal(kv.Key, []byte(hcDefinition+RetryTimeKey)) {
 				if !bytes.Equal(kv.Value, []byte(strconv.FormatUint(uint64(hc.RetryTime), 10))) {
 					kvs[hcDefinition+RetryTimeKey] = strconv.FormatUint(uint64(hc.RetryTime), 10)
 				}
@@ -431,27 +431,27 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 						sdkLogger.Info("router still online, can not be updated")
 						break
 					}
-				} else if bytes.Equal(kv.Key, []byte(routerName + IDKey)) {
+				} else if bytes.Equal(kv.Key, []byte(routerName+IDKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.ID)) {
 						kvs[routerName+IDKey] = r.ID
 					}
-				} else if bytes.Equal(kv.Key, []byte(routerName + NameKey)) {
+				} else if bytes.Equal(kv.Key, []byte(routerName+NameKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.Name)) {
 						kvs[routerName+NameKey] = r.Name
 					}
-				} else if bytes.Equal(kv.Key, []byte(routerName + StatusKey)) {
+				} else if bytes.Equal(kv.Key, []byte(routerName+StatusKey)) {
 					if !bytes.Equal(kv.Value, []byte(strconv.FormatUint(uint64(r.Status), 10))) {
 						kvs[routerName+StatusKey] = strconv.FormatUint(uint64(r.Status), 10)
 					}
-				} else if bytes.Equal(kv.Key, []byte(routerName + FrontendKey)) {
+				} else if bytes.Equal(kv.Key, []byte(routerName+FrontendKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.Frontend)) {
 						kvs[routerName+FrontendKey] = r.Frontend
 					}
-				} else if bytes.Equal(kv.Key, []byte(routerName + BackendKey)) {
+				} else if bytes.Equal(kv.Key, []byte(routerName+BackendKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.Backend)) {
 						kvs[routerName+BackendKey] = r.Backend
 					}
-				} else if bytes.Equal(kv.Key, []byte(routerName + ServiceKey)) {
+				} else if bytes.Equal(kv.Key, []byte(routerName+ServiceKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.Service.Name)) {
 						kvs[routerName+ServiceKey] = r.Service.Name
 					}
