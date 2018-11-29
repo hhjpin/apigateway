@@ -1,9 +1,9 @@
 package main
 
 import (
-	"api_gateway/sdk/golang"
 	"flag"
 	"fmt"
+	"git.henghajiang.com/backend/api_gateway_v2/sdk/golang"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -31,7 +31,7 @@ func init() {
 		svr,
 		[]*golang.Router{
 			golang.NewRouter("test1", "/front/$1", "/test/$1", svr),
-			golang.NewRouter("test2", "/api/v1/test", "/test", svr),
+			golang.NewRouter("test2", "/api/v1/test/$1", "/test/$1", svr),
 			golang.NewRouter("test3", "/rd", "/redirect", svr),
 		},
 	)

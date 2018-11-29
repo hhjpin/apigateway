@@ -59,9 +59,9 @@ func init() {
 	}
 }
 
-func (c *counting) String() string {
-
-}
+//func (c *counting) String() string {
+//
+//}
 
 func NewCounting(reqTime, respTime int64,
 	oriPath, method, svr, host, path, reqContentType, respContentType []byte,

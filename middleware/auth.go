@@ -43,21 +43,21 @@ func (a *Auth) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 	ctx.SetUserValue("user_id", 0)
 
 	if token != "" {
-		t, err := jwt.ParseWithClaims(token, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
+		_, err := jwt.ParseWithClaims(token, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 			return []byte(tokenSignature), nil
 		})
 		if err != nil {
 			authLogger.Exception(err)
 		} else {
-			hhjConn.Where(&hhj.Tokens{Token: token}).First(&tokens)
-			if claims, ok := t.Claims.(*CustomClaims); ok && t.Valid {
-				if claims.UserID == tokens.UserID {
-					// authorization passed
-					log.Print(claims.UserID)
-					ctx.SetUserValue("is_logged_in", true)
-					ctx.SetUserValue("user_id", claims.UserID)
-				}
-			}
+			//hhjConn.Where(&hhj.Tokens{Token: token}).First(&tokens)
+			//if claims, ok := t.Claims.(*CustomClaims); ok && t.Valid {
+			//	if claims.UserID == tokens.UserID {
+			//		// authorization passed
+			//		log.Print(claims.UserID)
+			//		ctx.SetUserValue("is_logged_in", true)
+			//		ctx.SetUserValue("user_id", claims.UserID)
+			//	}
+			//}
 		}
 	}
 }

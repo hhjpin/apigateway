@@ -1,9 +1,9 @@
 package core
 
 import (
-	"api_gateway/middleware"
 	"bytes"
 	"fmt"
+	"git.henghajiang.com/backend/api_gateway_v2/middleware"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/go-ego/murmur"
@@ -19,6 +19,7 @@ var (
 func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middleware) fasthttp.RequestHandler {
 	return fasthttp.TimeoutHandler(
 		func(ctx *fasthttp.RequestCtx) {
+			start := time.Now()
 			ctx.SetUserValue("RoutingTable", table)
 			if len(middle) > 0 {
 				errChan := make(chan error, len(middle))
@@ -52,6 +53,7 @@ func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middlew
 				}
 			}
 			ReverseProxyHandler(ctx)
+			go middleware.Logger(ctx.Response.StatusCode(), string(ctx.Request.URI().Path()), string(ctx.Request.Header.Method()), ctx.RemoteIP().String(), start)
 			return
 		},
 		time.Second*5,
@@ -62,9 +64,6 @@ func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middlew
 func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	var target TargetServer
 
-	path := ctx.Path()
-	routingTable := ctx.UserValue("RoutingTable")
-
 	revReq := fasthttp.AcquireRequest()
 	revReqUri := fasthttp.AcquireURI()
 	revRes := fasthttp.AcquireResponse()
@@ -74,6 +73,44 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	defer fasthttp.ReleaseRequest(revReq)
 	defer fasthttp.ReleaseResponse(revRes)
 	defer fasthttp.ReleaseURI(revReqUri)
+
+	defer func() {
+		var resContentType []byte
+
+		if revRes != nil {
+			resContentType = revRes.Header.ContentType()
+		}
+
+		counting := middleware.NewCounting(
+			ctx.ConnTime().UnixNano(),
+			time.Now().UnixNano(),
+			ctx.Path(),
+			ctx.Method(),
+			target.svr,
+			target.host,
+			target.uri,
+			ctx.Request.Header.ContentType(),
+			resContentType,
+			revReqHeader,
+			revReqUrlParam,
+			ctx.Response.StatusCode(),
+			ctx.Request.Body(),
+			ctx.Response.Body(),
+		)
+		go func() {
+			hashed := murmur.Sum32(strconv.FormatUint(ctx.ConnID(), 10)) % middleware.CountingShardNumber
+			timer := time.NewTimer(5 * time.Second)
+			select {
+			case <-timer.C:
+				proxyLogger.Warning("Counting channel maybe full")
+			case middleware.CountingCh[hashed] <- counting:
+				// pass
+			}
+		}()
+	}()
+
+	path := ctx.Path()
+	routingTable := ctx.UserValue("RoutingTable")
 
 	if routingTable == nil {
 		proxyLogger.Error("Routing Table not exists")
@@ -146,38 +183,4 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.SetContentTypeBytes(revRes.Header.ContentType())
 	ctx.SetBody(revRes.Body())
 
-	defer func() {
-		var resContentType []byte
-
-		if revRes != nil {
-			resContentType = revRes.Header.ContentType()
-		}
-
-		counting := middleware.NewCounting(
-			ctx.ConnTime().UnixNano(),
-			time.Now().UnixNano(),
-			ctx.Path(),
-			ctx.Method(),
-			target.svr,
-			target.host,
-			target.uri,
-			ctx.Request.Header.ContentType(),
-			resContentType,
-			revReqHeader,
-			revReqUrlParam,
-			ctx.Response.StatusCode(),
-			ctx.Request.Body(),
-			ctx.Response.Body(),
-		)
-		go func() {
-			hashed := murmur.Sum32(strconv.FormatUint(ctx.ConnID(), 10)) % middleware.CountingShardNumber
-			timer := time.NewTimer(5 * time.Second)
-			select {
-			case <-timer.C:
-				proxyLogger.Warning("Counting channel maybe full")
-			case middleware.CountingCh[hashed] <- counting:
-				// pass
-			}
-		}()
-	}()
 }

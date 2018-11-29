@@ -16,9 +16,9 @@
 package core
 
 import (
-	"api_gateway/middleware"
 	"bytes"
 	"container/ring"
+	"git.henghajiang.com/backend/api_gateway_v2/middleware"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/deckarep/golang-set"

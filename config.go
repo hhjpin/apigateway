@@ -59,13 +59,13 @@ type Config struct {
 	} `yaml:"Limiter"`
 
 	Counter struct {
-		ShardNumber int `yaml:"ShardNumber"`
+		ShardNumber       int `yaml:"ShardNumber"`
 		PersistencePeriod int `yaml:"PersistencePeriod"`
 	} `yaml:"Counter"`
 
 	Auth struct {
 		Redis struct {
-			Addr string `yaml:"Addr"`
+			Addr     string `yaml:"Addr"`
 			Password string `yaml:"Password"`
 			Database string `yaml:"Database"`
 		} `yaml:"Redis"`

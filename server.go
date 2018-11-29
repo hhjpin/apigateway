@@ -1,10 +1,9 @@
 package main
 
 import (
-	"api_gateway/core"
-	"api_gateway/middleware"
-	"context"
 	"fmt"
+	"git.henghajiang.com/backend/api_gateway_v2/core"
+	"git.henghajiang.com/backend/api_gateway_v2/middleware"
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/valyala/fasthttp"
@@ -75,10 +74,10 @@ func init() {
 	etcdCli := ConnectToEtcd()
 	table = core.InitRoutingTable(etcdCli)
 
-	ctx := context.Background()
-	ch := etcdCli.Watch(ctx, "/Router", clientv3.WithPrefix())
+	//ctx := context.Background()
+	//ch := etcdCli.Watch(ctx, "/Router", clientv3.WithPrefix())
 
-	go core.RouterWatcher(ch)
+	//go core.RouterWatcher(ch)
 }
 
 func main() {

@@ -45,14 +45,14 @@ var (
 	etcdLogger = log.New()
 )
 
-func RouterWatcher(watchChannel clientv3.WatchChan) {
-	for {
-		resp := <-watchChannel
-		for _, i := range resp.Events {
-			etcdLogger.Info(i)
-		}
-	}
-}
+//func RouterWatcher(watchChannel clientv3.WatchChan) {
+//	for {
+//		resp := <-watchChannel
+//		for _, i := range resp.Events {
+//			etcdLogger.Info(i)
+//		}
+//	}
+//}
 
 func InitRoutingTable(cli *clientv3.Client) *RoutingTable {
 	var rt RoutingTable
@@ -79,8 +79,10 @@ func InitRoutingTable(cli *clientv3.Client) *RoutingTable {
 			epSlice = append(epSlice, value)
 		}
 	})
+	logger.Debugf("epSlice length: %d", len(epSlice))
 	if len(epSlice) > 0 {
 		for _, ep := range epSlice {
+			logger.Debugf("ep: %+v", *ep)
 			if check, err := ep.healthCheck.Check(ep.host, ep.port); check {
 				ep.setStatus(Online)
 			} else {
