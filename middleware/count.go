@@ -1,12 +1,11 @@
 package middleware
 
 import (
+	"bytes"
 	"encoding/json"
 	"git.henghajiang.com/backend/golang_utils/errors"
-	"git.henghajiang.com/backend/golang_utils/log"
 	"os"
 	"strconv"
-	"time"
 )
 
 type counting struct {
@@ -37,14 +36,13 @@ var (
 	CountingCh []chan *counting
 
 	hostName []byte
-
-	ctLogger = log.New()
+	applicationJsonType = []byte("application/json")
 )
 
 func init() {
 	tmp, err := os.Hostname()
 	if err != nil {
-		ctLogger.Exception(err)
+		logger.Exception(err)
 		hostName = []byte("unknown-host")
 	} else {
 		hostName = []byte(tmp)
@@ -54,9 +52,10 @@ func init() {
 		CountingCh = append(CountingCh, make(chan *counting, 500))
 	}
 
-	for _, c := range CountingCh {
-		go persistence(c)
-	}
+	//for _, c := range CountingCh {
+	//	go persistence(c)
+	//}
+
 }
 
 //func (c *counting) String() string {
@@ -89,8 +88,12 @@ func NewCounting(reqTime, respTime int64,
 	c.RequestHeader = reqHeader
 	c.UrlParams = urlParam
 	c.ResponseStatusCode = status
-	c.RequestBody = reqBody
-	c.ResponseBody = respBody
+	if bytes.Equal(c.RequestContentType, applicationJsonType) {
+		c.RequestBody = reqBody
+	}
+	if bytes.Equal(c.ResponseBody, applicationJsonType) {
+		c.ResponseBody = respBody
+	}
 
 	if err := json.Unmarshal(c.ResponseBody, &resp); err == nil {
 		if resp.ErrCode != 0 {
@@ -103,11 +106,8 @@ func NewCounting(reqTime, respTime int64,
 	return &c
 }
 
-func persistence(c chan *counting) {
-	for {
-		for ct := range c {
-			ctLogger.Infof("counting log: %+v", *ct)
-		}
-		time.Sleep(10 * time.Second)
-	}
+func persistence(c []*counting) {
+
+
+
 }

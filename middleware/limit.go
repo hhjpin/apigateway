@@ -1,14 +1,30 @@
 package middleware
 
 import (
+	"context"
+	config "git.henghajiang.com/backend/api_gateway_v2/conf"
 	"git.henghajiang.com/backend/golang_utils/errors"
-	"git.henghajiang.com/backend/golang_utils/log"
+	"github.com/go-ego/murmur"
 	"github.com/valyala/fasthttp"
+	"os"
+	"os/signal"
+	"runtime"
 	"sync"
+	"syscall"
 	"time"
 )
 
 type CountChan chan string
+
+type blackListItem struct {
+	limit     uint64
+	expiresAt int64
+}
+
+type Limiters struct {
+	limiterArray []*limiter
+	ReceiveChan []CountChan
+}
 
 type limiter struct {
 	limit    uint64
@@ -17,32 +33,49 @@ type limiter struct {
 
 	sync.RWMutex
 	internal  map[string]uint64
-	blackList map[string]*struct {
-		limit     uint64
-		expiresAt int64
-	}
+	blackList map[string]*blackListItem
 }
 
 var (
-	Limiter = &limiter{
-		limit:    3,
-		consume:  1,
-		interval: 5,
-		internal: map[string]uint64{},
-		blackList: map[string]*struct {
-			limit     uint64
-			expiresAt int64
-		}{},
-	}
-	limitCh     = make(CountChan, 1000)
-	limitLogger = log.New()
+	limiters Limiters
+	shardNumber int
 )
 
 func init() {
-	limitLogger.EnableDebug()
+	limiterConf := config.ReadConfig().Middleware.Limiter
 
-	go Limiter.run()
-	go Limiter.consuming()
+	shardNumber = runtime.NumCPU()
+	limiters = Limiters{
+		limiterArray: make([]*limiter, shardNumber),
+		ReceiveChan:  make([]CountChan, shardNumber),
+	}
+
+	blackList := make(map[string]*blackListItem)
+	for idx, item := range limiterConf.DefaultBlackList {
+		tmp := limiterConf.DefaultBlackList[idx]
+		blackList[item.IP] = &blackListItem{
+			limit:     tmp.Limit,
+			expiresAt: tmp.ExpiresAt,
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	for i := 0; i <= shardNumber-1; i++ {
+		limiters.limiterArray[i] = &limiter{
+			limit:     limiterConf.DefaultLimit,
+			consume:   limiterConf.DefaultConsumePerPeriod,
+			interval:  limiterConf.DefaultConsumePeriod,
+			blackList: blackList,
+		}
+		limiters.ReceiveChan[i] = make(CountChan, limiterConf.LimiterChanLength)
+		go limiters.limiterArray[i].run(ctx, limiters.ReceiveChan[i])
+		go limiters.limiterArray[i].consuming(ctx)
+	}
+
+	c := make(chan os.Signal)
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	<- c
+	cancel()
 }
 
 func (l *limiter) SetBlackList(ip string, limit uint64, expiresAt int64) {
@@ -51,10 +84,7 @@ func (l *limiter) SetBlackList(ip string, limit uint64, expiresAt int64) {
 		b.limit = limit
 		b.expiresAt = expiresAt
 	} else {
-		l.blackList[ip] = &struct {
-			limit     uint64
-			expiresAt int64
-		}{
+		l.blackList[ip] = &blackListItem {
 			limit:     limit,
 			expiresAt: expiresAt,
 		}
@@ -77,19 +107,29 @@ func (l *limiter) VerifyBlackList(ip string) (uint64, bool) {
 	}
 }
 
-func (l *limiter) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
+func (l *Limiters) SetBlackList(ip string, limit uint64, expiresAt int64){
+	for _, i := range l.limiterArray {
+		i.SetBlackList(ip, limit, expiresAt)
+	}
+}
+
+func (l *Limiters) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 	remoteIP := ctx.RemoteIP().String()
-	limitCh <- remoteIP
-	burst := l.Burst(remoteIP)
-	black, exists := l.VerifyBlackList(remoteIP)
+	shardInt := murmur.Sum32(remoteIP)
+	shard := int(shardInt) % shardNumber
+	l.ReceiveChan[shard] <- remoteIP
+
+	limiter := l.limiterArray[shard]
+	burst := limiter.Burst(remoteIP)
+	black, exists := limiter.VerifyBlackList(remoteIP)
 	if exists {
-		limitLogger.Debugf("ip %s in blacklist, limit: %d", remoteIP, black)
+		logger.Debugf("ip %s in blacklist, limit: %d", remoteIP, black)
 		if burst >= black {
 			errChan <- errors.NewFormat(11, "请联系客服解除封禁限制")
 		}
 	} else {
-		limitLogger.Debugf("remote ip request burst: %d, limit: %d", burst, l.limit)
-		if burst >= l.limit {
+		logger.Debugf("remote ip request burst: %d, limit: %d", burst, limiter.limit)
+		if burst >= limiter.limit {
 			errChan <- errors.New(10)
 		} else {
 			errChan <- nil
@@ -98,8 +138,14 @@ func (l *limiter) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 	return
 }
 
-func (l *limiter) run() {
-	for rec := range limitCh {
+func (l *limiter) run(ctx context.Context, recv CountChan) {
+	for rec := range recv {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			// pass
+		}
 		l.Lock()
 		if c, ok := l.internal[rec]; ok {
 			if c < l.limit {
@@ -112,8 +158,14 @@ func (l *limiter) run() {
 	}
 }
 
-func (l *limiter) consuming() {
+func (l *limiter) consuming(ctx context.Context) {
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			// pass
+		}
 		l.Lock()
 		for k, v := range l.internal {
 			if v < l.consume {
