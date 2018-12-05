@@ -35,7 +35,7 @@ const (
 var (
 	CountingCh []chan *counting
 
-	hostName []byte
+	hostName            []byte
 	applicationJsonType = []byte("application/json")
 )
 
@@ -107,7 +107,5 @@ func NewCounting(reqTime, respTime int64,
 }
 
 func persistence(c []*counting) {
-
-
 
 }

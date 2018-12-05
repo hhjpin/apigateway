@@ -48,7 +48,7 @@ type Config struct {
 	Middleware struct {
 		Limiter struct {
 			DefaultLimit            uint64 `yaml:"DefaultLimit"`
-			DefaultConsumePerPeriod uint64 `yaml:"DefaultConsumePerPeriod"`
+			DefaultConsumePerPeriod uint64 `yaml:"DefaultConsumeNumberPerPeriod"`
 			DefaultConsumePeriod    int64  `yaml:"DefaultConsumePeriod"`
 			LimiterChanLength       uint64 `yaml:"LimiterChanLength"`
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/conf"
 	"git.henghajiang.com/backend/api_gateway_v2/core"
@@ -75,11 +76,11 @@ func ConnectToEtcd() *clientv3.Client {
 func init() {
 	etcdCli := ConnectToEtcd()
 	table = core.InitRoutingTable(etcdCli)
+	ctx := context.Background()
+	ch := etcdCli.Watch(ctx, "/Router", clientv3.WithPrefix())
 
-	//ctx := context.Background()
-	//ch := etcdCli.Watch(ctx, "/Router", clientv3.WithPrefix())
-
-	//go core.RouterWatcher(ch)
+	go table.HealthCheck()
+	go core.RouterWatcher(ch)
 }
 
 func main() {
@@ -101,7 +102,7 @@ func main() {
 	}
 
 	host := fmt.Sprintf("%s:%d", serverConf.ListenHost, serverConf.ListenPort)
-	logger.Info("gateway server start at: %s", host)
+	logger.Infof("gateway server start at: %s", host)
 	err := server.ListenAndServe(host)
 	if err != nil {
 		logger.Exception(err)
