@@ -5,15 +5,10 @@ import (
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
 	"git.henghajiang.com/backend/golang_utils/errors"
-	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/go-ego/murmur"
 	"github.com/valyala/fasthttp"
 	"strconv"
 	"time"
-)
-
-var (
-	proxyLogger = log.New()
 )
 
 func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middleware) fasthttp.RequestHandler {
@@ -34,7 +29,9 @@ func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middlew
 						ctx.Response.SetStatusCode(fasthttp.StatusOK)
 						ctx.Response.Header.Set("Server", "Api Gateway")
 						ctx.Response.Header.SetContentTypeBytes(strApplicationJson)
-						ctx.Response.SetBody(errors.New(5).MarshalEmptyData())
+						body := errors.New(5).MarshalEmptyData()
+						ctx.Response.SetBody(body)
+						go middleware.Logger(ctx.Response.StatusCode(), string(ctx.Request.URI().Path()), string(ctx.Request.Header.Method()), ctx.RemoteIP().String(), start)
 						return
 					case e := <-errChan:
 						if e != nil {
@@ -43,9 +40,11 @@ func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middlew
 							ctx.Response.Header.SetContentTypeBytes(strApplicationJson)
 							if err, ok := e.(errors.Error); ok {
 								ctx.Response.SetBody(err.MarshalEmptyData())
+								go middleware.Logger(ctx.Response.StatusCode(), string(ctx.Request.URI().Path()), string(ctx.Request.Header.Method()), ctx.RemoteIP().String(), start)
 								return
 							} else {
 								ctx.Response.SetBody(errors.New(1).MarshalEmptyData())
+								go middleware.Logger(ctx.Response.StatusCode(), string(ctx.Request.URI().Path()), string(ctx.Request.Header.Method()), ctx.RemoteIP().String(), start)
 								return
 							}
 						}
@@ -57,7 +56,7 @@ func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middlew
 			return
 		},
 		time.Second*5,
-		errors.New(5).Error(),
+		string(errors.New(5).MarshalEmptyData()),
 	)
 }
 
@@ -102,7 +101,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 			timer := time.NewTimer(5 * time.Second)
 			select {
 			case <-timer.C:
-				proxyLogger.Warning("Counting channel maybe full")
+				logger.Warning("Counting channel maybe full")
 			case middleware.CountingCh[hashed] <- counting:
 				// pass
 			}
@@ -113,21 +112,21 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	routingTable := ctx.UserValue("RoutingTable")
 
 	if routingTable == nil {
-		proxyLogger.Error("Routing Table not exists")
+		logger.Error("Routing Table not exists")
 		ctx.Error(string(errors.New(7).MarshalEmptyData()), fasthttp.StatusInternalServerError)
 		return
 	}
 
 	rt, ok := routingTable.(*RoutingTable)
 	if !ok {
-		proxyLogger.Error("wrong type of Routing Table")
+		logger.Error("wrong type of Routing Table")
 		ctx.Error(string(errors.New(7).MarshalEmptyData()), fasthttp.StatusInternalServerError)
 		return
 	}
 
 	target, err := rt.Select(path)
 	if err != nil {
-		proxyLogger.Exception(err)
+		logger.Exception(err)
 		if e, ok := err.(errors.Error); ok {
 			if e.ErrCode == 142 {
 				ctx.Error(string(e.MarshalEmptyData()), fasthttp.StatusNotFound)
@@ -168,7 +167,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	fmt.Println(string(revReq.Header.Method()))
 	err = fasthttp.Do(revReq, revRes)
 	if err != nil {
-		proxyLogger.Exception(err)
+		logger.Exception(err)
 		ctx.Error("Internal Server Error", fasthttp.StatusInternalServerError)
 		return
 	}
@@ -176,11 +175,10 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		if bytes.Equal(key, strHost) {
 			// pass
 		} else {
-			ctx.Response.Header.AppendBytes(value)
+			ctx.Response.Header.SetBytesKV(key, value)
 		}
 	})
 	ctx.Response.SetStatusCode(revRes.StatusCode())
 	ctx.Response.Header.SetContentTypeBytes(revRes.Header.ContentType())
 	ctx.SetBody(revRes.Body())
-
 }

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/sdk/golang"
+	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -13,6 +14,7 @@ import (
 
 var (
 	flagPort = flag.Int("port", 7789, "server listening port")
+	logger = log.New()
 )
 
 func init() {
@@ -54,13 +56,18 @@ func ConnectToEtcd() *clientv3.Client {
 }
 
 func main() {
-
+	flag.Parse()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	r := gin.New()
 	r.Use(gin.Logger())
 
 	r.POST("/test/:test_id", func(c *gin.Context) {
+		//for k, v := range c.Request.Header {
+		//	for _, i := range v {
+		//		c.Header(k, i)
+		//	}
+		//}
 		c.JSON(200, map[string]interface{}{"result": "success", "test_id": *flagPort})
 	})
 	r.GET("/check", func(c *gin.Context) {
