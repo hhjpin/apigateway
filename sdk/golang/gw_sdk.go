@@ -3,6 +3,7 @@ package golang
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -53,22 +54,11 @@ type ApiGatewayRegistrant struct {
 }
 
 var (
-	sdkLogger = log.New()
+	logger = log.New()
 )
 
 func NewHealthCheck(path string, timeout, interval, retryTime uint8, retry bool) *HealthCheck {
-	var uid string
-
-	hardwareAddr := GetHardwareAddressAsLong()
-	if len(hardwareAddr) > 0 {
-		// use hardware address of first interface
-		uid = strconv.FormatInt(hardwareAddr[0], 10)
-	} else {
-		sdkLogger.Error("can not gain local hardware address")
-	}
-
 	return &HealthCheck{
-		ID:        uid,
 		Path:      path,
 		Timeout:   timeout,
 		Interval:  interval,
@@ -83,14 +73,14 @@ func NewNode(name, host string, port int, hc *HealthCheck) *Node {
 	hardwareAddr := GetHardwareAddressAsLong()
 	if len(hardwareAddr) > 0 {
 		// use hardware address of first interface
-		uid = strconv.FormatInt(hardwareAddr[0], 10)
+		uid = strconv.FormatInt(hardwareAddr[0], 10) + ":" + strconv.FormatInt(int64(port), 10)
 	} else {
-		sdkLogger.Error("can not gain local hardware address")
+		logger.Error("can not gain local hardware address")
 	}
-
+	hc.ID = uid
 	return &Node{
 		ID:     uid,
-		Name:   name + uid,
+		Name:   name + ":" + uid,
 		Host:   host,
 		Port:   port,
 		Status: 0,
@@ -106,18 +96,13 @@ func NewService(name string, node *Node) *Service {
 }
 
 func NewRouter(name, frontend, backend string, service *Service) *Router {
-	var uid string
+	src := fmt.Sprintf("%s-%s-%s-%s", name, frontend, backend, service.Name)
 
-	hardwareAddr := GetHardwareAddressAsLong()
-	if len(hardwareAddr) > 0 {
-		// use hardware address of first interface
-		uid = strconv.FormatInt(hardwareAddr[0], 10)
-	} else {
-		sdkLogger.Error("can not gain local hardware address")
-	}
-
+	data := []byte(src)
+	hashed := md5.Sum(data)
+	md5str1 := fmt.Sprintf("%x", hashed)
 	return &Router{
-		ID:       uid,
+		ID:       md5str1,
 		Name:     name,
 		Status:   0,
 		Frontend: frontend,
@@ -138,7 +123,7 @@ func NewApiGatewayRegistrant(cli *clientv3.Client, node *Node, service *Service,
 
 func (gw *ApiGatewayRegistrant) getKeyValue(key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
 	if gw.cli == nil {
-		sdkLogger.Error("etcd client need initialize")
+		logger.Error("etcd client need initialize")
 	}
 	cli := gw.cli
 
@@ -150,7 +135,7 @@ func (gw *ApiGatewayRegistrant) getKeyValue(key string, opts ...clientv3.OpOptio
 
 func (gw *ApiGatewayRegistrant) getKeyValueWithPrefix(key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
 	if gw.cli == nil {
-		sdkLogger.Error("etcd client need initialize")
+		logger.Error("etcd client need initialize")
 	}
 	cli := gw.cli
 
@@ -164,7 +149,7 @@ func (gw *ApiGatewayRegistrant) getKeyValueWithPrefix(key string, opts ...client
 
 func (gw *ApiGatewayRegistrant) putKeyValue(key, value string, opts ...clientv3.OpOption) (*clientv3.PutResponse, error) {
 	if gw.cli == nil {
-		sdkLogger.Error("etcd client need initialize")
+		logger.Error("etcd client need initialize")
 	}
 	cli := gw.cli
 
@@ -178,7 +163,7 @@ func (gw *ApiGatewayRegistrant) putKeyValue(key, value string, opts ...clientv3.
 
 func (gw *ApiGatewayRegistrant) putMany(kv interface{}, opts ...clientv3.OpOption) error {
 	if gw.cli == nil {
-		sdkLogger.Error("etcd client need initialize")
+		logger.Error("etcd client need initialize")
 	}
 	cli := gw.cli
 
@@ -219,7 +204,7 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
 	resp, err := gw.getKeyValueWithPrefix(nodeDefinition)
 	if err != nil {
-		sdkLogger.Exception(err)
+		logger.Exception(err)
 		return err
 	}
 	n := gw.node
@@ -259,15 +244,17 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 					kvs[nodeDefinition+ServiceKey] = n.HC.ID
 				}
 			} else {
-				sdkLogger.Warningf("unrecognized node key: %s", string(kv.Key))
+				logger.Warningf("unrecognized node key: %s", string(kv.Key))
 			}
 		}
-		sdkLogger.Infof("node keys waiting to be updated: %+v", kvs)
+		if len(kvs) > 0 {
+			logger.Infof("node keys waiting to be updated: %+v", kvs)
+		}
 	}
 
 	err = gw.putMany(kvs)
 	if err != nil {
-		sdkLogger.Exception(err)
+		logger.Exception(err)
 		return err
 	}
 
@@ -275,7 +262,7 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 	hcDefinition := fmt.Sprintf(HealthCheckDefinition, hc.ID)
 	resp, err = gw.getKeyValueWithPrefix(hcDefinition)
 	if err != nil {
-		sdkLogger.Exception(err)
+		logger.Exception(err)
 		return err
 	}
 	kvs = make(map[string]interface{})
@@ -326,15 +313,17 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 					kvs[hcDefinition+RetryTimeKey] = strconv.FormatUint(uint64(hc.RetryTime), 10)
 				}
 			} else {
-				sdkLogger.Warningf("unrecognized node key: %s", string(kv.Key))
+				logger.Warningf("unrecognized node key: %s", string(kv.Key))
 			}
 		}
-		sdkLogger.Infof("node keys waiting to be updated: %+v", kvs)
+		if len(kvs) > 0 {
+			logger.Infof("node keys waiting to be updated: %+v", kvs)
+		}
 	}
 
 	err = gw.putMany(kvs)
 	if err != nil {
-		sdkLogger.Exception(err)
+		logger.Exception(err)
 		return err
 	}
 
@@ -348,7 +337,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 	serviceDefinition := fmt.Sprintf(ServiceDefinition, gw.service.Name)
 	resp, err := gw.getKeyValueWithPrefix(serviceDefinition)
 	if err != nil {
-		sdkLogger.Exception(err)
+		logger.Exception(err)
 		return err
 	}
 	if resp.Count == 0 {
@@ -359,7 +348,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 		}
 		nodeSlice, err := json.Marshal(nodes)
 		if err != nil {
-			sdkLogger.Exception(err)
+			logger.Exception(err)
 			return err
 		}
 
@@ -368,7 +357,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 	} else {
 		resp, err := gw.getKeyValue(serviceDefinition + NodeKey)
 		if err != nil {
-			sdkLogger.Exception(err)
+			logger.Exception(err)
 			return err
 		}
 		if resp.Count == 0 {
@@ -378,7 +367,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 			var nodeSlice []string
 			err := json.Unmarshal(resp.Kvs[0].Value, &nodeSlice)
 			if err != nil {
-				sdkLogger.Exception(err)
+				logger.Exception(err)
 				return err
 			}
 			s := mapset.NewSet()
@@ -389,7 +378,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 				s.Add(gw.node.ID)
 				nodeByteSlice, err := json.Marshal(s.ToSlice())
 				if err != nil {
-					sdkLogger.Exception(err)
+					logger.Exception(err)
 					os.Exit(-1)
 				} else {
 					kvs[serviceDefinition+NodeKey] = string(nodeByteSlice)
@@ -399,7 +388,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 	}
 	err = gw.putMany(kvs)
 	if err != nil {
-		sdkLogger.Exception(err)
+		logger.Exception(err)
 		return err
 	}
 	return nil
@@ -408,12 +397,13 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 func (gw *ApiGatewayRegistrant) registerRouter() error {
 	for _, r := range gw.router {
 		var kvs map[string]interface{}
+		var ori map[string]interface{}
 		kvs = make(map[string]interface{})
-
+		ori = make(map[string]interface{})
 		routerName := fmt.Sprintf(RouterDefinition, r.Name)
 		resp, err := gw.getKeyValueWithPrefix(routerName)
 		if err != nil {
-			sdkLogger.Exception(err)
+			logger.Exception(err)
 			return err
 		}
 		if resp.Count == 0 {
@@ -426,44 +416,57 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 		} else {
 			for _, kv := range resp.Kvs {
 				if bytes.Equal(kv.Key, []byte(routerName+StatusKey)) {
-					if string(kv.Value) == "1" {
-						// router still online, can not be updated
-						sdkLogger.Info("router still online, can not be updated")
-						break
-					}
+					ori[routerName+StatusKey] = kv.Value
 				} else if bytes.Equal(kv.Key, []byte(routerName+IDKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.ID)) {
-						kvs[routerName+IDKey] = r.ID
+						kvs[routerName+IDKey] = kv.Value
 					}
+					ori[routerName+IDKey] = r.ID
 				} else if bytes.Equal(kv.Key, []byte(routerName+NameKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.Name)) {
 						kvs[routerName+NameKey] = r.Name
 					}
-				} else if bytes.Equal(kv.Key, []byte(routerName+StatusKey)) {
-					if !bytes.Equal(kv.Value, []byte(strconv.FormatUint(uint64(r.Status), 10))) {
-						kvs[routerName+StatusKey] = strconv.FormatUint(uint64(r.Status), 10)
-					}
+					ori[routerName+NameKey] = kv.Value
 				} else if bytes.Equal(kv.Key, []byte(routerName+FrontendKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.Frontend)) {
 						kvs[routerName+FrontendKey] = r.Frontend
 					}
+					ori[routerName+FrontendKey] = kv.Value
 				} else if bytes.Equal(kv.Key, []byte(routerName+BackendKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.Backend)) {
 						kvs[routerName+BackendKey] = r.Backend
 					}
+					ori[routerName+BackendKey] = kv.Value
 				} else if bytes.Equal(kv.Key, []byte(routerName+ServiceKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.Service.Name)) {
 						kvs[routerName+ServiceKey] = r.Service.Name
 					}
+					ori[routerName+ServiceKey] = kv.Value
 				} else {
-					sdkLogger.Warningf("unrecognized router key: %s", string(kv.Key))
+					logger.Warningf("unrecognized router key: %s", string(kv.Key))
 				}
 			}
-			sdkLogger.Infof("router keys waiting to be updated: %+v", kvs)
+			if _, ok := kvs[routerName+FrontendKey]; ok {
+				if ori[routerName+FrontendKey] != kvs[routerName+FrontendKey] {
+					// just a new route, but have a duplicated name
+					logger.Debugf("original frontend key: %s; current frontend key: %s", string(ori[routerName+FrontendKey].([]byte)), string(kvs[routerName+FrontendKey].([]byte)))
+					logger.Warningf("router {%s} maybe a new router, please checkout", string(ori[routerName+NameKey].([]byte)))
+					os.Exit(-1)
+				}
+			}
+			if len(kvs) > 0 {
+				logger.Infof("router keys waiting to be updated: %+v", kvs)
+				if ori[routerName + StatusKey] == "1" {
+					// original router still alive, can not modify router
+					logger.Warning("original router still alive, can not modify router")
+					logger.Warning("if need modify online router, please use a new one instead")
+					os.Exit(-1)
+				}
+			}
 		}
 		err = gw.putMany(kvs)
 		if err != nil {
-			sdkLogger.Exception(err)
+			logger.Exception(err)
 			return err
 		}
 	}
@@ -472,8 +475,14 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 }
 
 func (gw *ApiGatewayRegistrant) Register() error {
-	fmt.Print(gw.registerNode())
-	fmt.Print(gw.registerService())
-	fmt.Print(gw.registerRouter())
+	if err := gw.registerNode(); err != nil {
+		logger.Exception(err)
+	}
+	if err := gw.registerService(); err != nil {
+		logger.Exception(err)
+	}
+	if err := gw.registerRouter(); err != nil {
+		logger.Exception(err)
+	}
 	return nil
 }

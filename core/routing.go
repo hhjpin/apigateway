@@ -18,12 +18,14 @@ package core
 import (
 	"bytes"
 	"container/ring"
+	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
 	"git.henghajiang.com/backend/golang_utils/errors"
-	"git.henghajiang.com/backend/golang_utils/log"
+	"github.com/coreos/etcd/clientv3"
 	"github.com/deckarep/golang-set"
 	"github.com/golang/time/rate"
 	"strconv"
+	"time"
 )
 
 const (
@@ -35,8 +37,6 @@ const (
 var (
 	VariableIdentifier = []byte("$")
 	UriSlash           = []byte("/")
-
-	rtLogger = log.New()
 )
 
 type Status uint8
@@ -60,6 +60,8 @@ type RoutingTable struct {
 	endpointTable EndpointTableMap
 	// router table
 	routerTable RouterTableMap
+
+	cli *clientv3.Client
 }
 
 // FrontendApi-struct used to create Frontend-FrontendApi or Backend-FrontendApi. <string> type attr `pathString` is using on mapping tables
@@ -79,6 +81,7 @@ type BackendApi struct {
 
 // Endpoint-struct defined a backend-endpoint
 type Endpoint struct {
+	id string
 	name       []byte
 	nameString EndpointNameString
 
@@ -119,11 +122,15 @@ type TargetServer struct {
 	svr  []byte
 }
 
+func (s Status) String() string {
+	return strconv.FormatInt(int64(s), 10)
+}
+
 func (r *RoutingTable) addBackendService(service *Service) (ok bool, err error) {
 
 	_, exists := r.serviceTable.Load(service.nameString)
 	if exists {
-		rtLogger.Info("service already exists")
+		logger.Info("service already exists")
 		return false, errors.New(120)
 	}
 	r.serviceTable.Store(service.nameString, service)
@@ -134,7 +141,7 @@ func (r *RoutingTable) removeBackendService(service *Service) (ok bool, err erro
 
 	_, exists := r.serviceTable.Load(service.nameString)
 	if !exists {
-		rtLogger.Info("service not exist")
+		logger.Info("service not exist")
 		return false, errors.New(121)
 	}
 	r.serviceTable.Delete(service.nameString)
@@ -145,7 +152,7 @@ func (r *RoutingTable) addBackendEndpoint(ep *Endpoint) (ok bool, err error) {
 
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if exists {
-		rtLogger.Info("ep already exists")
+		logger.Info("ep already exists")
 		return false, errors.New(122)
 	}
 	r.endpointTable.Store(ep.nameString, ep)
@@ -156,7 +163,7 @@ func (r *RoutingTable) removeBackendEndpoint(ep *Endpoint) (ok bool, err error) 
 
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if !exists {
-		rtLogger.Info("ep not exist")
+		logger.Info("ep not exist")
 		return false, errors.New(123)
 	}
 	r.endpointTable.Delete(ep.nameString)
@@ -223,11 +230,11 @@ func (r *RoutingTable) RemoveFrontendApi(path []byte) (ok bool, err error) {
 
 func (r *RoutingTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *BackendApi, svr *Service, mw ...*middleware.Middleware) error {
 	if fApi.pathString == "" || bApi.pathString == "" {
-		rtLogger.Error("api obj not completed")
+		logger.Error("api obj not completed")
 		return errors.New(126)
 	}
 	if svr.nameString == "" {
-		rtLogger.Error("service obj not completed")
+		logger.Error("service obj not completed")
 		return errors.New(127)
 	}
 
@@ -252,7 +259,7 @@ func (r *RoutingTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *Backen
 				for _, i := range rest {
 					_, e := r.addBackendEndpoint(i)
 					if e != nil {
-						rtLogger.Error("error raised when add endpoint to endpoint-table")
+						logger.Error("error raised when add endpoint to endpoint-table")
 						return errors.New(129)
 					}
 				}
@@ -270,7 +277,7 @@ func (r *RoutingTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *Backen
 func (r *RoutingTable) GetRouterByName(name []byte) (*Router, error) {
 	router, exists := r.routerTable.Load(RouterNameString(name))
 	if !exists {
-		rtLogger.Warning("can not find router by name")
+		logger.Warning("can not find router by name")
 		return nil, errors.New(131)
 	}
 	return router, nil
@@ -280,7 +287,7 @@ func (r *RoutingTable) RemoveRouter(router *Router) (ok bool, err error) {
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
-		rtLogger.Warning("router not exists")
+		logger.Warning("router not exists")
 		return false, errors.New(125)
 	}
 
@@ -298,7 +305,7 @@ func (r *RoutingTable) SetRouterOnline(router *Router) (ok bool, err error) {
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
-		rtLogger.Warning("router not exists")
+		logger.Warning("router not exists")
 		return false, errors.New(125)
 	}
 
@@ -318,12 +325,13 @@ func (r *RoutingTable) SetRouterOnline(router *Router) (ok bool, err error) {
 				for _, i := range rest {
 					_, e := r.addBackendEndpoint(i)
 					if e != nil {
-						rtLogger.Error("error raised when add endpoint to endpoint-table")
+						logger.Error("error raised when add endpoint to endpoint-table")
 						return false, errors.New(134)
 					}
 				}
 			}
 			router.setStatus(Online)
+			r.putKeyValue(router.key(StatusKeyString), Online.String())
 			r.onlineTable.Store(router.frontendApi, router)
 			return true, nil
 		}
@@ -345,7 +353,7 @@ func (r *RoutingTable) SetRouterStatus(router *Router, status Status) (ok bool, 
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
-		rtLogger.Warning("router not exists")
+		logger.Warning("router not exists")
 		return false, errors.New(125)
 	}
 
@@ -356,6 +364,7 @@ func (r *RoutingTable) SetRouterStatus(router *Router, status Status) (ok bool, 
 		r.onlineTable.Delete(router.frontendApi)
 	}
 	router.setStatus(status)
+	r.putKeyValue(router.key(StatusKeyString), status.String())
 	return true, nil
 }
 
@@ -380,7 +389,7 @@ func (r *RoutingTable) GetServiceByName(name []byte) (*Service, error) {
 
 	service, exists := r.serviceTable.Load(ServiceNameString(name))
 	if !exists {
-		rtLogger.Warning("can not find service by name")
+		logger.Warning("can not find service by name")
 		return nil, errors.New(137)
 	}
 	return service, nil
@@ -391,7 +400,7 @@ func (r *RoutingTable) RemoveService(svr *Service) error {
 
 	_, exists := r.serviceTable.Load(svr.nameString)
 	if !exists {
-		rtLogger.Warning("can not find service by name")
+		logger.Warning("can not find service by name")
 		return errors.New(137)
 	}
 
@@ -442,7 +451,7 @@ func (r *RoutingTable) GetEndpointByName(name EndpointNameString) (*Endpoint, er
 	if exists {
 		return endpoint, nil
 	} else {
-		rtLogger.Warning("can not find endpoint by name")
+		logger.Warning("can not find endpoint by name")
 		return nil, errors.New(139)
 	}
 }
@@ -450,10 +459,25 @@ func (r *RoutingTable) GetEndpointByName(name EndpointNameString) (*Endpoint, er
 func (r *RoutingTable) SetEndpointOnline(ep *Endpoint) error {
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if !exists {
-		rtLogger.Warning("endpoint not exists")
+		logger.Warning("endpoint not exists")
 		return errors.New(139)
 	}
+	r.putKeyValue(ep.key(StatusKeyString), Online.String())
 	ep.setStatus(Online)
+	return nil
+}
+
+func (r *RoutingTable) SetEndpointStatus(ep *Endpoint, status Status) error {
+	_, exists := r.endpointTable.Load(ep.nameString)
+	if !exists {
+		logger.Warning("endpoint not exists")
+		return errors.New(139)
+	}
+	if status == Online {
+		return r.SetEndpointOnline(ep)
+	}
+	r.putKeyValue(ep.key(StatusKeyString), status.String())
+	ep.setStatus(status)
 	return nil
 }
 
@@ -461,7 +485,7 @@ func (r *RoutingTable) RemoveEndpoint(svr *Endpoint) error {
 
 	_, exists := r.endpointTable.Load(svr.nameString)
 	if !exists {
-		rtLogger.Warning("can not find endpoint by name")
+		logger.Warning("can not find endpoint by name")
 		return errors.New(139)
 	}
 
@@ -534,6 +558,14 @@ func (r *Router) CheckStatus(must Status) bool {
 	}
 }
 
+func (r *Router) key(attr ...string) string {
+	if len(attr) > 0 {
+		return RouterDefinition + fmt.Sprintf(RouterPrefixString, string(r.name)) + attr[0]
+	} else {
+		return RouterDefinition + fmt.Sprintf(RouterPrefixString, string(r.name))
+	}
+}
+
 func (s *Service) equal(another *Service) bool {
 	if bytes.Equal(s.name, another.name) && s.nameString == another.nameString && s.ep.equal(another.ep) {
 		return true
@@ -593,6 +625,14 @@ func (s *Service) ResetOnlineEndpointRing(online []*Endpoint) error {
 	return nil
 }
 
+func (ep *Endpoint) key(attr ...string) string {
+	if len(attr) > 0 {
+		return NodeDefinition + fmt.Sprintf(NodePrefixString, ep.id) + attr[0]
+	} else {
+		return NodeDefinition + fmt.Sprintf(NodePrefixString, ep.id)
+	}
+}
+
 func (ep *Endpoint) equal(another *Endpoint) bool {
 	if bytes.Equal(ep.name, another.name) && ep.nameString == another.nameString && ep.status == another.status &&
 		bytes.Equal(ep.host, another.host) && ep.port == another.port {
@@ -604,6 +644,66 @@ func (ep *Endpoint) equal(another *Endpoint) bool {
 
 func (ep *Endpoint) setStatus(status Status) {
 	ep.status = status
+}
+
+func (r *RoutingTable) HealthCheck() {
+	for {
+		r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) {
+			var status Status
+			resp, err := r.getKeyValue(value.key(StatusKeyString))
+			if err != nil {
+				logger.Exception(err)
+				status = BreakDown
+			} else {
+				for _, kv := range resp.Kvs {
+					if bytes.Equal(kv.Key, []byte(value.key(StatusKeyString))) {
+						statusInt, err := strconv.ParseInt(string(kv.Value), 10, 64)
+						if err != nil {
+							logger.Exception(err)
+							status = BreakDown
+						} else {
+							status = Status(statusInt)
+						}
+					} else {
+						status = BreakDown
+					}
+				}
+			}
+			if check, err := value.healthCheck.Check(value.host, value.port); err == nil {
+				if check {
+					if status != Online {
+						r.SetEndpointStatus(value, Online)
+					}
+				} else {
+					if status != Offline {
+						r.SetEndpointStatus(value, Offline)
+					}
+				}
+			} else {
+				logger.Error(err.(errors.Error).String())
+				if status != BreakDown {
+					r.SetEndpointStatus(value, BreakDown)
+				}
+			}
+		})
+		r.routerTable.Range(func(key RouterNameString, value *Router) {
+			if value.CheckStatus(Online) {
+				if value.status != Online {
+					r.SetRouterStatus(value, Online)
+				}
+			} else {
+				if value.status != Offline {
+					r.SetRouterStatus(value, Offline)
+				}
+			}
+			confirm, _ := value.service.checkEndpointStatus(Online)
+			if err := value.service.ResetOnlineEndpointRing(confirm); err != nil {
+				logger.Error(err.(errors.Error).String())
+			}
+		})
+
+		time.Sleep(time.Second * 10)
+	}
 }
 
 func (r *RoutingTable) Select(input []byte) (TargetServer, error) {
@@ -631,7 +731,9 @@ func (r *RoutingTable) Select(input []byte) (TargetServer, error) {
 	ringLength := matchRouter.service.onlineEp.Len()
 	counts := 0
 	for {
-		next := matchRouter.service.onlineEp.Next().Value
+		logger.Debugf("online ep ring current: %s, next: %s, prev: %s", matchRouter.service.onlineEp.Value, matchRouter.service.onlineEp.Next().Value, matchRouter.service.onlineEp.Prev().Value)
+		next := matchRouter.service.onlineEp.Value
+		matchRouter.service.onlineEp = matchRouter.service.onlineEp.Move(1)
 		_, ok := next.(EndpointNameString)
 		if !ok {
 			return TargetServer{}, errors.New(140)
