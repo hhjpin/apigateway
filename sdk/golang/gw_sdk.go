@@ -201,6 +201,23 @@ func (gw *ApiGatewayRegistrant) putMany(kv interface{}, opts ...clientv3.OpOptio
 	return nil
 }
 
+func (gw *ApiGatewayRegistrant) getAttr(key string) string {
+	resp, err := gw.getKeyValue(key)
+	if err != nil {
+		logger.Exception(err)
+		return ""
+	}
+	if resp.Count == 0 {
+		return ""
+	} else if resp.Count == 1 {
+		return string(resp.Kvs[0].Value)
+	} else {
+		logger.Warningf("attr [%s] exists more than one key", key)
+		os.Exit(-1)
+		return ""
+	}
+}
+
 func (gw *ApiGatewayRegistrant) registerNode() error {
 	var kvs map[string]interface{}
 	kvs = make(map[string]interface{})
@@ -220,36 +237,25 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 		kvs[nodeDefinition+StatusKey] = strconv.FormatUint(uint64(n.Status), 10)
 		kvs[nodeDefinition+HealthCheckKey] = n.HC.ID
 	} else {
-		for _, kv := range resp.Kvs {
-			if bytes.Equal(kv.Key, []byte(nodeDefinition+StatusKey)) {
-				// pass
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+IDKey)) {
-				if !bytes.Equal(kv.Value, []byte(n.ID)) {
-					kvs[nodeDefinition+IDKey] = n.ID
-				}
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+NameKey)) {
-				if !bytes.Equal(kv.Value, []byte(n.Name)) {
-					kvs[nodeDefinition+NameKey] = n.Name
-				}
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+StatusKey)) {
-				if !bytes.Equal(kv.Value, []byte(strconv.FormatUint(uint64(n.Status), 10))) {
-					kvs[nodeDefinition+StatusKey] = strconv.FormatUint(uint64(n.Status), 10)
-				}
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+HostKey)) {
-				if !bytes.Equal(kv.Value, []byte(n.Host)) {
-					kvs[nodeDefinition+HostKey] = n.Host
-				}
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+PortKey)) {
-				if !bytes.Equal(kv.Value, []byte(strconv.FormatInt(int64(n.Port), 10))) {
-					kvs[nodeDefinition+BackendKey] = strconv.FormatInt(int64(n.Port), 10)
-				}
-			} else if bytes.Equal(kv.Key, []byte(nodeDefinition+HealthCheckKey)) {
-				if !bytes.Equal(kv.Value, []byte(n.HC.ID)) {
-					kvs[nodeDefinition+ServiceKey] = n.HC.ID
-				}
-			} else {
-				logger.Warningf("unrecognized node key: %s", string(kv.Key))
-			}
+		id := gw.getAttr(nodeDefinition + IDKey)
+		name := gw.getAttr(nodeDefinition + NameKey)
+		host := gw.getAttr(nodeDefinition + HostKey)
+		port := gw.getAttr(nodeDefinition + PortKey)
+		healthCheck := gw.getAttr(nodeDefinition + HealthCheckKey)
+		if id != n.ID {
+			kvs[nodeDefinition+IDKey] = n.ID
+		}
+		if name != n.Name {
+			kvs[nodeDefinition+NameKey] = n.Name
+		}
+		if host != n.Host {
+			kvs[nodeDefinition+HostKey] = n.Host
+		}
+		if port != strconv.FormatInt(int64(n.Port), 10) {
+			kvs[nodeDefinition+PortKey] = n.Port
+		}
+		if healthCheck != n.HC.ID {
+			kvs[nodeDefinition+HealthCheckKey] = n.HC.ID
 		}
 		if len(kvs) > 0 {
 			logger.Infof("node keys waiting to be updated: %+v", kvs)

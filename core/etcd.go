@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
+	"os"
 	"strconv"
 	"time"
 )
@@ -67,6 +68,7 @@ func InitRoutingTable(cli *clientv3.Client) *RoutingTable {
 	svrMap, epMap, err := initServiceNode(cli)
 	if err != nil {
 		logger.Exception(err)
+		os.Exit(-1)
 	}
 	rt.serviceTable = *svrMap
 	rt.endpointTable = *epMap
