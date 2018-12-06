@@ -13,7 +13,6 @@ func (r *RoutingTable) getKeyValue(key string, opts ...clientv3.OpOption) (*clie
 		return nil, errors.NewFormat(200, "etcd client need initialising")
 	}
 	cli := r.cli
-	logger.Debugf("Get key: %s", key)
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	resp, err := cli.Get(ctx, key, opts...)
 	cancel()
@@ -26,7 +25,6 @@ func (r *RoutingTable) getKeyValueWithPrefix(key string, opts ...clientv3.OpOpti
 		return nil, errors.NewFormat(200, "etcd client need initialising")
 	}
 	cli := r.cli
-	logger.Debugf("Get key: %s with prefix", key)
 	opts = append(opts, clientv3.WithPrefix())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
@@ -41,7 +39,6 @@ func (r *RoutingTable) putKeyValue(key, value string, opts ...clientv3.OpOption)
 		return nil, errors.NewFormat(200, "etcd client need initialising")
 	}
 	cli := r.cli
-	logger.Debugf("Put kv: {%s: %s}", key, value)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	resp, err := cli.Put(ctx, key, value, opts...)

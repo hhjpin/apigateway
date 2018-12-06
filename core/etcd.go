@@ -14,13 +14,14 @@ const (
 	Root                        = "/"
 	Slash                       = "/"
 	RouterDefinition            = "/Router/"
-	RouterPrefixString     = "Router-%s/"
+	RouterPrefixString          = "Router-%s/"
 	ServiceDefinition           = "/Service/"
-	NodeDefinition = "/Node/"
-	NodePrefixString = "Node-%s/"
+	NodeDefinition              = "/Node/"
+	NodePrefixString            = "Node-%s/"
 	NodePrefixDefinition        = "/Node/Node-"
 	HealthCheckPrefixDefinition = "/HealthCheck/HC-"
-	StatusKeyString = "Status"
+	StatusKeyString             = "Status"
+	FailedTimesKeyString = "FailedTimes"
 )
 
 var (
@@ -50,6 +51,7 @@ func RouterWatcher(watchChannel clientv3.WatchChan) {
 	for {
 		resp := <-watchChannel
 		for _, i := range resp.Events {
+
 			logger.Info(i)
 		}
 	}

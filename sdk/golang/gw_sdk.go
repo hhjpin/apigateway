@@ -12,6 +12,7 @@ import (
 	"github.com/deckarep/golang-set"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -97,7 +98,10 @@ func NewService(name string, node *Node) *Service {
 
 func NewRouter(name, frontend, backend string, service *Service) *Router {
 	src := fmt.Sprintf("%s-%s-%s-%s", name, frontend, backend, service.Name)
-
+	if strings.Contains(name, "/") {
+		logger.Errorf("name can not contains '/'")
+		os.Exit(-1)
+	}
 	data := []byte(src)
 	hashed := md5.Sum(data)
 	md5str1 := fmt.Sprintf("%x", hashed)
@@ -456,7 +460,7 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 			}
 			if len(kvs) > 0 {
 				logger.Infof("router keys waiting to be updated: %+v", kvs)
-				if ori[routerName + StatusKey] == "1" {
+				if ori[routerName+StatusKey] == "1" {
 					// original router still alive, can not modify router
 					logger.Warning("original router still alive, can not modify router")
 					logger.Warning("if need modify online router, please use a new one instead")

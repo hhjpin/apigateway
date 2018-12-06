@@ -39,7 +39,7 @@ type limiter struct {
 }
 
 const (
-	maxUint64 uint64 = 18446744073709551614
+	maxUint64      uint64 = 18446744073709551614
 	maxBannedCount uint64 = 10
 )
 
@@ -72,7 +72,7 @@ func init() {
 			limit:     limiterConf.DefaultLimit,
 			consume:   limiterConf.DefaultConsumePerPeriod,
 			interval:  limiterConf.DefaultConsumePeriod,
-			internal: make(map[string]uint64),
+			internal:  make(map[string]uint64),
 			blackList: blackList,
 		}
 		Limiter.ReceiveChan[i] = make(CountChan, limiterConf.LimiterChanLength)

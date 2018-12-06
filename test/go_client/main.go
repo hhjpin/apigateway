@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/sdk/golang"
-	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -14,7 +13,6 @@ import (
 
 var (
 	flagPort = flag.Int("port", 7789, "server listening port")
-	logger = log.New()
 )
 
 func init() {

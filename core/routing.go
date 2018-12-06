@@ -81,7 +81,7 @@ type BackendApi struct {
 
 // Endpoint-struct defined a backend-endpoint
 type Endpoint struct {
-	id string
+	id         string
 	name       []byte
 	nameString EndpointNameString
 
@@ -462,6 +462,16 @@ func (r *RoutingTable) SetEndpointOnline(ep *Endpoint) error {
 		logger.Warning("endpoint not exists")
 		return errors.New(139)
 	}
+	resp, err := r.getKeyValue(ep.key(FailedTimesKeyString))
+	if err != nil {
+		logger.Error(err.Error())
+		return err
+	}
+	if resp.Count == 0 {
+		//
+	} else {
+		r.putKeyValue(ep.key(FailedTimesKeyString), "")
+	}
 	r.putKeyValue(ep.key(StatusKeyString), Online.String())
 	ep.setStatus(Online)
 	return nil
@@ -473,12 +483,44 @@ func (r *RoutingTable) SetEndpointStatus(ep *Endpoint, status Status) error {
 		logger.Warning("endpoint not exists")
 		return errors.New(139)
 	}
-	if status == Online {
+	switch status {
+	case Online:
 		return r.SetEndpointOnline(ep)
+	case BreakDown:
+		var failedTimes int64
+		resp, err := r.getKeyValue(ep.key(FailedTimesKeyString))
+		if err != nil {
+			logger.Error(err.Error())
+			return err
+		}
+		if resp.Count == 0 {
+			r.putKeyValue(ep.key(FailedTimesKeyString), "1")
+		} else {
+			failedTimes, err = strconv.ParseInt(string(resp.Kvs[0].Value), 10, 64)
+			if err != nil {
+				logger.Error(err.Error())
+				failedTimes = 1
+			}
+			r.putKeyValue(ep.key(FailedTimesKeyString), strconv.FormatInt(failedTimes + 1, 10))
+		}
+		logger.Debugf("failedTimes: %d, maxRetryTimes: %d", int(failedTimes), int(ep.healthCheck.retryTime))
+		if int(failedTimes) >= int(ep.healthCheck.retryTime) {
+			// exceed max retry times, tag this ep to offline
+			r.putKeyValue(ep.key(StatusKeyString), Offline.String())
+			ep.setStatus(Offline)
+		} else {
+			r.putKeyValue(ep.key(StatusKeyString), BreakDown.String())
+			ep.setStatus(BreakDown)
+		}
+		return nil
+	case Offline:
+		r.putKeyValue(ep.key(StatusKeyString), status.String())
+		ep.setStatus(status)
+		return nil
+	default:
+		logger.Warningf("unrecognized status: %d", status.String())
+		return nil
 	}
-	r.putKeyValue(ep.key(StatusKeyString), status.String())
-	ep.setStatus(status)
-	return nil
 }
 
 func (r *RoutingTable) RemoveEndpoint(svr *Endpoint) error {
@@ -650,6 +692,10 @@ func (r *RoutingTable) HealthCheck() {
 	for {
 		r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) {
 			var status Status
+			if value.status == Offline {
+				logger.Warningf("endpoints [%s] offline, skip health-check", value.nameString)
+				return
+			}
 			resp, err := r.getKeyValue(value.key(StatusKeyString))
 			if err != nil {
 				logger.Exception(err)
@@ -681,24 +727,28 @@ func (r *RoutingTable) HealthCheck() {
 				}
 			} else {
 				logger.Error(err.(errors.Error).String())
-				if status != BreakDown {
-					r.SetEndpointStatus(value, BreakDown)
-				}
+				r.SetEndpointStatus(value, BreakDown)
 			}
 		})
 		r.routerTable.Range(func(key RouterNameString, value *Router) {
-			if value.CheckStatus(Online) {
+			confirm, rest := value.service.checkEndpointStatus(Online)
+			if len(confirm) > 0 {
 				if value.status != Online {
-					r.SetRouterStatus(value, Online)
+					r.SetRouterOnline(value)
+				}
+				if err := value.service.ResetOnlineEndpointRing(confirm); err != nil {
+					logger.Error(err.(errors.Error).String())
 				}
 			} else {
+				for _, i := range rest{
+					if i.status == BreakDown && value.status != BreakDown{
+						r.SetRouterStatus(value, BreakDown)
+						return
+					}
+				}
 				if value.status != Offline {
 					r.SetRouterStatus(value, Offline)
 				}
-			}
-			confirm, _ := value.service.checkEndpointStatus(Online)
-			if err := value.service.ResetOnlineEndpointRing(confirm); err != nil {
-				logger.Error(err.(errors.Error).String())
 			}
 		})
 

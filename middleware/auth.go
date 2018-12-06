@@ -3,10 +3,9 @@ package middleware
 import (
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gomodule/redigo/redis"
 	"github.com/valyala/fasthttp"
 	"strings"
-	"github.com/gomodule/redigo/redis"
-
 )
 
 type CustomClaims struct {
@@ -24,8 +23,7 @@ type Auth struct {
 
 const (
 	tokenSignature = "henghajiangiscoming20161010"
-	token2user    = "hhj:token:user"
-
+	token2user     = "hhj:token:user"
 )
 
 var (
@@ -33,18 +31,17 @@ var (
 )
 var redisConn redis.Conn
 
-
 func init() {
-	var auth Auth
-
-	redisConn, err := redis.Dial("tcp", auth.Redis.Addr, redis.DialPassword(auth.Redis.Password))
-	if err != nil {
-		authLogger.Exception(err)
-	}
-	_, err = redisConn.Do("SELECT", auth.Redis.Database)
-	if err != nil {
-		authLogger.Exception(err)
-	}
+	//var auth Auth
+	//
+	//redisConn, err := redis.Dial("tcp", auth.Redis.Addr, redis.DialPassword(auth.Redis.Password))
+	//if err != nil {
+	//	authLogger.Exception(err)
+	//}
+	//_, err = redisConn.Do("SELECT", auth.Redis.Database)
+	//if err != nil {
+	//	authLogger.Exception(err)
+	//}
 }
 
 func GetUserByToken(token string) (userId int, err error) {
@@ -52,11 +49,9 @@ func GetUserByToken(token string) (userId int, err error) {
 	return
 }
 
-
 func (a *Auth) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 	var token string
 	var authorization string
-
 
 	ctx.Request.Header.VisitAll(func(key, value []byte) {
 		if string(key) == "Authorization" {

@@ -10,7 +10,7 @@ import (
 )
 
 type HealthCheck struct {
-	id string
+	id   string
 	path []byte
 
 	// timeout default is 5 sec. When timed out, will retry to check again based on 'retry' switch on or not
