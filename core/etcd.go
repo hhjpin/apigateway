@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"git.henghajiang.com/backend/golang_utils"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
 	"os"
@@ -48,7 +50,19 @@ var (
 	ServiceDefinitionBytes = []byte("/Service/")
 )
 
+type Model struct {
+	cli *clientv3.Client
+}
+
 func RouterWatcher(watchChannel clientv3.WatchChan) {
+	defer func() {
+		if err := recover(); err != nil {
+			stack := stack(3)
+			go golang_utils.ErrMail("dropshipping_mp_user err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
+			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack)
+		}
+	}()
+
 	for {
 		resp := <-watchChannel
 		for _, i := range resp.Events {
@@ -147,8 +161,8 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 					for _, n := range nodeSlice {
 						ep, err := initEndpointNode(cli, n)
 						if err != nil {
-							logger.Exception(err)
-							return nil, nil, err
+							logger.Error(err.Error())
+							continue
 						}
 						if s.ep != nil {
 							if _, ok := s.ep.Load(ep.nameString); !ok {
@@ -197,8 +211,8 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 					for _, n := range nodeSlice {
 						ep, err := initEndpointNode(cli, n)
 						if err != nil {
-							logger.Exception(err)
-							return nil, nil, err
+							logger.Error(err.Error())
+							continue
 						}
 						epSlice.Store(ep.nameString, ep)
 					}
@@ -424,4 +438,21 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 		artMap.Store(value.frontendApi.pathString, value)
 	})
 	return rtMap, artMap, nil
+}
+
+func NewModel(cli *clientv3.Client) *Model {
+	return &Model{
+		cli: cli,
+	}
+}
+
+func (m *Model) QueryRouterByName(name string) (*Router, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	resp, err := m.cli.Get(ctx, RouterDefinition + fmt.Sprintf(RouterPrefixString, name), clientv3.WithPrefix())
+	cancel()
+	if err != nil {
+		logger.Exception(err)
+		return nil, error
+	}
+	if resp.Count == 0 {}
 }

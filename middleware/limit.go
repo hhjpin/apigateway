@@ -4,15 +4,12 @@ import (
 	"context"
 	"fmt"
 	config "git.henghajiang.com/backend/api_gateway_v2/conf"
+	"git.henghajiang.com/backend/golang_utils"
 	"git.henghajiang.com/backend/golang_utils/errors"
-	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/go-ego/murmur"
 	"github.com/valyala/fasthttp"
-	"os"
-	"os/signal"
 	"runtime"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -66,7 +63,7 @@ func init() {
 		}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, _ := context.WithCancel(context.Background())
 	for i := 0; i <= shardNumber-1; i++ {
 		Limiter.limiterArray[i] = &limiter{
 			limit:     limiterConf.DefaultLimit,
@@ -79,13 +76,6 @@ func init() {
 		go Limiter.limiterArray[i].run(ctx, Limiter.ReceiveChan[i])
 		go Limiter.limiterArray[i].consuming(ctx)
 	}
-
-	go func(cancelFunc context.CancelFunc) {
-		c := make(chan os.Signal)
-		signal.Notify(c, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-		<-c
-		cancelFunc()
-	}(cancel)
 }
 
 func (l *limiter) SetBlackList(ip string, limit uint64, expiresAt int64) {
@@ -165,6 +155,13 @@ func (l Limiters) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 }
 
 func (l *limiter) run(ctx context.Context, recv CountChan) {
+	defer func() {
+		if err := recover(); err != nil {
+			stack := stack(3)
+			go golang_utils.ErrMail("dropshipping_mp_user err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
+			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack)
+		}
+	}()
 	for rec := range recv {
 		select {
 		case <-ctx.Done():
@@ -185,8 +182,13 @@ func (l *limiter) run(ctx context.Context, recv CountChan) {
 }
 
 func (l *limiter) consuming(ctx context.Context) {
-	cLogger := log.New()
-	cLogger.EnableDebug()
+	defer func() {
+		if err := recover(); err != nil {
+			stack := stack(3)
+			go golang_utils.ErrMail("dropshipping_mp_user err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
+			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack)
+		}
+	}()
 	for {
 		select {
 		case <-ctx.Done():
@@ -196,7 +198,7 @@ func (l *limiter) consuming(ctx context.Context) {
 		}
 		l.Lock()
 		for k, v := range l.internal {
-			cLogger.Debugf("limiter: %+v", *l)
+			logger.Debugf("limiter: %+v", *l)
 			if v < l.consume {
 				delete(l.internal, k)
 			} else {

@@ -20,6 +20,7 @@ import (
 	"container/ring"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
+	"git.henghajiang.com/backend/golang_utils"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/deckarep/golang-set"
@@ -689,6 +690,13 @@ func (ep *Endpoint) setStatus(status Status) {
 }
 
 func (r *RoutingTable) HealthCheck() {
+	defer func() {
+		if err := recover(); err != nil {
+			stack := stack(3)
+			go golang_utils.ErrMail("dropshipping_mp_user err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
+			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack)
+		}
+	}()
 	for {
 		r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) {
 			var status Status
@@ -763,7 +771,7 @@ func (r *RoutingTable) Select(input []byte) (TargetServer, error) {
 	inputByteSlice := bytes.Split(input, UriSlash)
 	r.onlineTable.Range(func(key *FrontendApi, value *Router) bool {
 		matched, replaced := match(inputByteSlice, key.pattern, value.backendApi.pattern)
-		if matched {
+		if matched && value.status == Online {
 			matchRouter = value
 			replacedBackendUri = replaced
 			return true

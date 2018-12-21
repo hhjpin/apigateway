@@ -77,10 +77,13 @@ func init() {
 	etcdCli := ConnectToEtcd()
 	table = core.InitRoutingTable(etcdCli)
 	ctx := context.Background()
-	ch := etcdCli.Watch(ctx, "/Router", clientv3.WithPrefix())
+	routerCh := etcdCli.Watch(ctx, "/Router", clientv3.WithPrefix())
+	svrCh := etcdCli.Watch(ctx, "/Service", clientv3.WithPrefix())
+	epCh := etcdCli.Watch(ctx, "/Node", clientv3.WithPrefix())
+	heathCh := etcdCli.Watch(ctx, "/HealthCheck", clientv3.WithPrefix())
 
 	go table.HealthCheck()
-	go core.RouterWatcher(ch)
+	go core.RouterWatcher(routerCh)
 }
 
 func main() {

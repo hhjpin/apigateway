@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/sdk/golang"
+	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -12,11 +13,12 @@ import (
 )
 
 var (
+	logger = log.New()
 	flagPort = flag.Int("port", 7789, "server listening port")
 )
 
 func init() {
-
+	flag.Parse()
 	node := golang.NewNode("localhost", "127.0.0.1", *flagPort, golang.NewHealthCheck(
 		"/check",
 		10,
@@ -24,6 +26,8 @@ func init() {
 		3,
 		true,
 	))
+	logger.Infof("flagPort： %d", *flagPort)
+	logger.Infof("node port: %d", node.Port)
 	svr := golang.NewService("test", node)
 	gw := golang.NewApiGatewayRegistrant(
 		ConnectToEtcd(),
@@ -54,18 +58,12 @@ func ConnectToEtcd() *clientv3.Client {
 }
 
 func main() {
-	flag.Parse()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	r := gin.New()
 	r.Use(gin.Logger())
 
 	r.POST("/test/:test_id", func(c *gin.Context) {
-		//for k, v := range c.Request.Header {
-		//	for _, i := range v {
-		//		c.Header(k, i)
-		//	}
-		//}
 		c.JSON(200, map[string]interface{}{"result": "success", "test_id": *flagPort})
 	})
 	r.GET("/check", func(c *gin.Context) {

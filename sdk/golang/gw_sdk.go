@@ -289,42 +289,33 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 		}
 		kvs[hcDefinition+RetryTimeKey] = strconv.FormatUint(uint64(hc.RetryTime), 10)
 	} else {
-		for _, kv := range resp.Kvs {
-			if bytes.Equal(kv.Key, []byte(hcDefinition+StatusKey)) {
-				// pass
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition+IDKey)) {
-				if !bytes.Equal(kv.Value, []byte(hc.ID)) {
-					kvs[hcDefinition+IDKey] = hc.ID
-				}
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition+PathKey)) {
-				if !bytes.Equal(kv.Value, []byte(hc.Path)) {
-					kvs[hcDefinition+PathKey] = hc.Path
-				}
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition+TimeoutKey)) {
-				if !bytes.Equal(kv.Value, []byte(strconv.FormatUint(uint64(hc.Timeout), 10))) {
-					kvs[hcDefinition+TimeoutKey] = strconv.FormatUint(uint64(hc.Timeout), 10)
-				}
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition+IntervalKey)) {
-				if !bytes.Equal(kv.Value, []byte(strconv.FormatUint(uint64(hc.Interval), 10))) {
-					kvs[hcDefinition+IntervalKey] = strconv.FormatUint(uint64(hc.Interval), 10)
-				}
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition+RetryKey)) {
-				var retry string
-				if hc.Retry {
-					retry = "1"
-				} else {
-					retry = "0"
-				}
-				if !bytes.Equal(kv.Value, []byte(retry)) {
-					kvs[hcDefinition+RetryKey] = retry
-				}
-			} else if bytes.Equal(kv.Key, []byte(hcDefinition+RetryTimeKey)) {
-				if !bytes.Equal(kv.Value, []byte(strconv.FormatUint(uint64(hc.RetryTime), 10))) {
-					kvs[hcDefinition+RetryTimeKey] = strconv.FormatUint(uint64(hc.RetryTime), 10)
-				}
-			} else {
-				logger.Warningf("unrecognized node key: %s", string(kv.Key))
-			}
+		id := gw.getAttr(hcDefinition+IDKey)
+		path := gw.getAttr(hcDefinition+PathKey)
+		timeout := gw.getAttr(hcDefinition+TimeoutKey)
+		interval := gw.getAttr(hcDefinition+IntervalKey)
+		retry := gw.getAttr(hcDefinition+RetryKey)
+		retryTime := gw.getAttr(hcDefinition+RetryTimeKey)
+		if id != hc.ID {
+			kvs[hcDefinition+IDKey] = hc.ID
+		}
+		if path != hc.Path {
+			kvs[hcDefinition+PathKey] = hc.Path
+		}
+		if timeout != strconv.FormatInt(int64(hc.Timeout), 10) {
+			kvs[hcDefinition+TimeoutKey] = hc.Timeout
+		}
+		if interval != strconv.FormatInt(int64(hc.Interval), 10) {
+			kvs[hcDefinition+IntervalKey] = hc.Interval
+		}
+		tmp := "1"
+		if !hc.Retry {
+			tmp = "0"
+		}
+		if retry != tmp {
+			kvs[hcDefinition+RetryKey] = tmp
+		}
+		if retryTime != strconv.FormatInt(int64(hc.RetryTime), 10) {
+			kvs[hcDefinition+RetryTimeKey] = hc.RetryTime
 		}
 		if len(kvs) > 0 {
 			logger.Infof("node keys waiting to be updated: %+v", kvs)
