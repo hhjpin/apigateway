@@ -13,20 +13,19 @@
 		Service:
 			[]Endpoint
 */
-package core
+package routing
 
 import (
 	"bytes"
 	"container/ring"
 	"fmt"
+	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
+	"git.henghajiang.com/backend/api_gateway_v2/core/utils"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
-	"git.henghajiang.com/backend/golang_utils"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/deckarep/golang-set"
 	"github.com/golang/time/rate"
 	"strconv"
-	"time"
 )
 
 const (
@@ -48,7 +47,7 @@ type ServiceNameString string
 type RouterNameString string
 
 // Routing table struct, should not be copied at any time. Using function `Init()` to create it
-type RoutingTable struct {
+type Table struct {
 	Version string
 
 	// frontend-api/router mapping table
@@ -127,29 +126,7 @@ func (s Status) String() string {
 	return strconv.FormatInt(int64(s), 10)
 }
 
-func (r *RoutingTable) addBackendService(service *Service) (ok bool, err error) {
-
-	_, exists := r.serviceTable.Load(service.nameString)
-	if exists {
-		logger.Info("service already exists")
-		return false, errors.New(120)
-	}
-	r.serviceTable.Store(service.nameString, service)
-	return true, nil
-}
-
-func (r *RoutingTable) removeBackendService(service *Service) (ok bool, err error) {
-
-	_, exists := r.serviceTable.Load(service.nameString)
-	if !exists {
-		logger.Info("service not exist")
-		return false, errors.New(121)
-	}
-	r.serviceTable.Delete(service.nameString)
-	return true, nil
-}
-
-func (r *RoutingTable) addBackendEndpoint(ep *Endpoint) (ok bool, err error) {
+func (r *Table) addBackendEndpoint(ep *Endpoint) (ok bool, err error) {
 
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if exists {
@@ -160,24 +137,13 @@ func (r *RoutingTable) addBackendEndpoint(ep *Endpoint) (ok bool, err error) {
 	return true, nil
 }
 
-func (r *RoutingTable) removeBackendEndpoint(ep *Endpoint) (ok bool, err error) {
-
-	_, exists := r.endpointTable.Load(ep.nameString)
-	if !exists {
-		logger.Info("ep not exist")
-		return false, errors.New(123)
-	}
-	r.endpointTable.Delete(ep.nameString)
-	return true, nil
-}
-
-func (r *RoutingTable) endpointExists(ep *Endpoint) bool {
+func (r *Table) endpointExists(ep *Endpoint) bool {
 	_, exists := r.endpointTable.Load(ep.nameString)
 	return exists
 }
 
 // check input endpoint exist in the endpoint-table or not, return the rest not-existed endpoint slice
-func (r *RoutingTable) endpointSliceExists(ep []*Endpoint) (rest []*Endpoint) {
+func (r *Table) endpointSliceExists(ep []*Endpoint) (rest []*Endpoint) {
 	if len(ep) > 0 {
 		for _, s := range ep {
 			if !r.endpointExists(s) {
@@ -188,103 +154,25 @@ func (r *RoutingTable) endpointSliceExists(ep []*Endpoint) (rest []*Endpoint) {
 	return rest
 }
 
-func (r *RoutingTable) CreateBackendApi(path []byte) *BackendApi {
-	path = prefixFilter(path)
-	return &BackendApi{
-		path:       path,
-		pathString: BackendApiString(path),
-		pattern:    bytes.Split(path, UriSlash),
-	}
-}
-
-// create frontend api obj, return pointer of api obj. if already exists, return that one
-func (r *RoutingTable) CreateFrontendApi(path []byte) (api *FrontendApi, ok bool) {
-	path = prefixFilter(path)
-	if router, exists := r.table.Load(FrontendApiString(path)); exists {
-		ok = false
-		api = router.frontendApi
-	} else {
-		ok = true
-		api = &FrontendApi{
-			path:       path,
-			pathString: FrontendApiString(path),
-			pattern:    bytes.Split(path, UriSlash),
-		}
-	}
-	return api, ok
-}
-
-func (r *RoutingTable) RemoveFrontendApi(path []byte) (ok bool, err error) {
-	if router, exists := r.table.Load(FrontendApiString(path)); exists {
-		if router.status == Online {
-			// router is online, api can not be deleted
-			return false, errors.New(124)
-		} else {
-			// remove frontend api from router obj.
-			router.frontendApi = nil
-			return true, nil
-		}
-	} else {
-		return false, errors.New(125)
-	}
-}
-
-func (r *RoutingTable) CreateRouter(name []byte, fApi *FrontendApi, bApi *BackendApi, svr *Service, mw ...*middleware.Middleware) error {
-	if fApi.pathString == "" || bApi.pathString == "" {
-		logger.Error("api obj not completed")
-		return errors.New(126)
-	}
-	if svr.nameString == "" {
-		logger.Error("service obj not completed")
-		return errors.New(127)
-	}
-
-	_, exists := r.table.Load(fApi.pathString)
-
-	if exists {
-		return errors.New(128)
-	} else {
-		router := &Router{
-			name:        name,
-			status:      Offline,
-			frontendApi: fApi,
-			backendApi:  bApi,
-			service:     svr,
-			middleware:  mw,
-		}
-
-		onlineEndpoint, _ := svr.checkEndpointStatus(Online)
-		if len(onlineEndpoint) > 0 {
-			rest := r.endpointSliceExists(onlineEndpoint)
-			if len(rest) > 0 {
-				for _, i := range rest {
-					_, e := r.addBackendEndpoint(i)
-					if e != nil {
-						logger.Error("error raised when add endpoint to endpoint-table")
-						return errors.New(129)
-					}
-				}
-			}
-		} else {
-			return errors.New(130)
-		}
-		r.addBackendService(svr)
-		r.table.Store(fApi.pathString, router)
-		r.routerTable.Store(RouterNameString(router.name), router)
-		return nil
-	}
-}
-
-func (r *RoutingTable) GetRouterByName(name []byte) (*Router, error) {
+func (r *Table) GetRouterByName(name []byte) (*Router, error) {
 	router, exists := r.routerTable.Load(RouterNameString(name))
 	if !exists {
-		logger.Warning("can not find router by name")
+		logger.Warning("can not find router by name: %s", RouterNameString(name))
 		return nil, errors.New(131)
 	}
 	return router, nil
 }
 
-func (r *RoutingTable) RemoveRouter(router *Router) (ok bool, err error) {
+func (r *Table) GetServiceByName(name []byte) (*Service, error) {
+	svr, exists := r.serviceTable.Load(ServiceNameString(name))
+	if !exists {
+		logger.Warningf("can not find service by name: %s", ServiceNameString(name))
+		return nil, errors.New(137)
+	}
+	return svr, nil
+}
+
+func (r *Table) RemoveRouter(router *Router) (ok bool, err error) {
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
@@ -302,7 +190,7 @@ func (r *RoutingTable) RemoveRouter(router *Router) (ok bool, err error) {
 	return true, nil
 }
 
-func (r *RoutingTable) SetRouterOnline(router *Router) (ok bool, err error) {
+func (r *Table) SetRouterOnline(router *Router) (ok bool, err error) {
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
@@ -331,8 +219,11 @@ func (r *RoutingTable) SetRouterOnline(router *Router) (ok bool, err error) {
 					}
 				}
 			}
+			if _, err := utils.PutKV(r.cli, router.key(constant.StatusKeyString), Online.String()); err != nil {
+				logger.Exception(err)
+				return false, err
+			}
 			router.setStatus(Online)
-			r.putKeyValue(router.key(StatusKeyString), Online.String())
 			r.onlineTable.Store(router.frontendApi, router)
 			return true, nil
 		}
@@ -347,7 +238,7 @@ func (r *RoutingTable) SetRouterOnline(router *Router) (ok bool, err error) {
 	}
 }
 
-func (r *RoutingTable) SetRouterStatus(router *Router, status Status) (ok bool, err error) {
+func (r *Table) SetRouterStatus(router *Router, status Status) (ok bool, err error) {
 	if status == Online {
 		return r.SetRouterOnline(router)
 	}
@@ -364,106 +255,21 @@ func (r *RoutingTable) SetRouterStatus(router *Router, status Status) (ok bool, 
 	} else {
 		r.onlineTable.Delete(router.frontendApi)
 	}
+	if _, err := utils.PutKV(r.cli, router.key(constant.StatusKeyString), status.String()); err != nil {
+		logger.Exception(err)
+		return false, err
+	}
 	router.setStatus(status)
-	r.putKeyValue(router.key(StatusKeyString), status.String())
 	return true, nil
 }
 
-func (r *RoutingTable) CreateService(name []byte, acceptHttpMethod [][]byte) *Service {
-
-	svr, exists := r.serviceTable.Load(ServiceNameString(name))
-	if exists {
-		return svr
-	} else {
-		service := &Service{
-			name:             name,
-			nameString:       ServiceNameString(name),
-			ep:               &EndpointTableMap{},
-			acceptHttpMethod: acceptHttpMethod,
-		}
-		r.serviceTable.Store(service.nameString, service)
-		return service
-	}
-}
-
-func (r *RoutingTable) GetServiceByName(name []byte) (*Service, error) {
-
-	service, exists := r.serviceTable.Load(ServiceNameString(name))
-	if !exists {
-		logger.Warning("can not find service by name")
-		return nil, errors.New(137)
-	}
-	return service, nil
-}
-
-func (r *RoutingTable) RemoveService(svr *Service) error {
-	var err error
-
-	_, exists := r.serviceTable.Load(svr.nameString)
-	if !exists {
-		logger.Warning("can not find service by name")
-		return errors.New(137)
-	}
-
-	r.table.Lock()
-	r.table.unsafeRange(func(key FrontendApiString, value *Router) {
-		if value.service == svr {
-			if value.status == Online {
-				err = errors.New(138)
-				return
-			}
-		}
-	})
-
-	r.table.unsafeRange(func(key FrontendApiString, value *Router) {
-		if value.service == svr {
-			value.service = nil
-		}
-	})
-	r.table.Unlock()
-
-	r.serviceTable.Delete(svr.nameString)
-	return err
-}
-
-func (r *RoutingTable) CreateEndpoint(name, host []byte, port int, hc *HealthCheck, rate *rate.Limiter) *Endpoint {
-
-	endpoint, exists := r.endpointTable.Load(EndpointNameString(name))
-	if exists {
-		return endpoint
-	} else {
-		endpoint := &Endpoint{
-			name:        name,
-			nameString:  EndpointNameString(name),
-			host:        host,
-			port:        port,
-			status:      Offline,
-			healthCheck: hc,
-			rate:        rate,
-		}
-		r.endpointTable.Store(endpoint.nameString, endpoint)
-		return endpoint
-	}
-}
-
-func (r *RoutingTable) GetEndpointByName(name EndpointNameString) (*Endpoint, error) {
-
-	endpoint, exists := r.endpointTable.Load(name)
-	if exists {
-		return endpoint, nil
-	} else {
-		logger.Warning("can not find endpoint by name")
-		return nil, errors.New(139)
-	}
-}
-
-func (r *RoutingTable) SetEndpointOnline(ep *Endpoint) error {
+func (r *Table) SetEndpointOnline(ep *Endpoint) error {
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if !exists {
 		logger.Warning("endpoint not exists")
 		return errors.New(139)
 	}
-	resp, err := r.getKeyValue(ep.key(FailedTimesKeyString))
+	resp, err := utils.GetKV(r.cli, ep.key(constant.FailedTimesKeyString))
 	if err != nil {
 		logger.Error(err.Error())
 		return err
@@ -471,14 +277,19 @@ func (r *RoutingTable) SetEndpointOnline(ep *Endpoint) error {
 	if resp.Count == 0 {
 		//
 	} else {
-		r.putKeyValue(ep.key(FailedTimesKeyString), "")
+		if _, err := utils.PutKV(r.cli, ep.key(constant.FailedTimesKeyString), ""); err != nil {
+			logger.Exception(err)
+		}
 	}
-	r.putKeyValue(ep.key(StatusKeyString), Online.String())
+	if _, err := utils.PutKV(r.cli, ep.key(constant.StatusKeyString), Online.String()); err != nil {
+		logger.Exception(err)
+		return err
+	}
 	ep.setStatus(Online)
 	return nil
 }
 
-func (r *RoutingTable) SetEndpointStatus(ep *Endpoint, status Status) error {
+func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if !exists {
 		logger.Warning("endpoint not exists")
@@ -489,63 +300,52 @@ func (r *RoutingTable) SetEndpointStatus(ep *Endpoint, status Status) error {
 		return r.SetEndpointOnline(ep)
 	case BreakDown:
 		var failedTimes int64
-		resp, err := r.getKeyValue(ep.key(FailedTimesKeyString))
+		resp, err := utils.GetKV(r.cli, ep.key(constant.FailedTimesKeyString))
 		if err != nil {
 			logger.Error(err.Error())
 			return err
 		}
 		if resp.Count == 0 {
-			r.putKeyValue(ep.key(FailedTimesKeyString), "1")
+			if _, err := utils.PutKV(r.cli, ep.key(constant.FailedTimesKeyString), "1"); err != nil {
+
+			}
 		} else {
 			failedTimes, err = strconv.ParseInt(string(resp.Kvs[0].Value), 10, 64)
 			if err != nil {
-				logger.Error(err.Error())
+				logger.Exception(err)
 				failedTimes = 1
 			}
-			r.putKeyValue(ep.key(FailedTimesKeyString), strconv.FormatInt(failedTimes + 1, 10))
+			if _, err := utils.PutKV(r.cli, ep.key(constant.FailedTimesKeyString), strconv.FormatInt(failedTimes + 1, 10)); err != nil {
+				logger.Exception(err)
+			}
 		}
 		logger.Debugf("failedTimes: %d, maxRetryTimes: %d", int(failedTimes), int(ep.healthCheck.retryTime))
 		if int(failedTimes) >= int(ep.healthCheck.retryTime) {
 			// exceed max retry times, tag this ep to offline
-			r.putKeyValue(ep.key(StatusKeyString), Offline.String())
+			if _, err := utils.PutKV(r.cli, ep.key(constant.StatusKeyString), Offline.String()); err != nil {
+				logger.Exception(err)
+				return err
+			}
 			ep.setStatus(Offline)
 		} else {
-			r.putKeyValue(ep.key(StatusKeyString), BreakDown.String())
+			if _, err := utils.PutKV(r.cli, ep.key(constant.StatusKeyString), BreakDown.String()); err != nil {
+				logger.Exception(err)
+				return err
+			}
 			ep.setStatus(BreakDown)
 		}
 		return nil
 	case Offline:
-		r.putKeyValue(ep.key(StatusKeyString), status.String())
+		if _, err := utils.PutKV(r.cli, ep.key(constant.StatusKeyString), status.String()); err != nil {
+			logger.Exception(err)
+			return err
+		}
 		ep.setStatus(status)
 		return nil
 	default:
 		logger.Warningf("unrecognized status: %d", status.String())
 		return nil
 	}
-}
-
-func (r *RoutingTable) RemoveEndpoint(svr *Endpoint) error {
-
-	_, exists := r.endpointTable.Load(svr.nameString)
-	if !exists {
-		logger.Warning("can not find endpoint by name")
-		return errors.New(139)
-	}
-
-	r.serviceTable.Lock()
-	r.serviceTable.unsafeRange(func(key ServiceNameString, value *Service) {
-		value.ep.Lock()
-		value.ep.unsafeRange(func(k EndpointNameString, v *Endpoint) {
-			if v == svr {
-				value.ep.Delete(svr.nameString)
-			}
-		})
-		value.ep.Unlock()
-	})
-	r.serviceTable.Unlock()
-
-	r.endpointTable.Delete(svr.nameString)
-	return nil
 }
 
 func (a *FrontendApi) equal(another *FrontendApi) bool {
@@ -568,23 +368,10 @@ func (r *Router) setStatus(status Status) {
 	r.status = status
 }
 
-func cmpPointerSlice(a, b []*middleware.Middleware) bool {
-	var aSet, bSet mapset.Set
-	aSet = mapset.NewSet()
-	for _, i := range a {
-		aSet.Add(i)
-	}
-	bSet = mapset.NewSet()
-	for _, j := range b {
-		bSet.Add(j)
-	}
-	return aSet.Equal(bSet)
-}
-
 func (r *Router) equal(another *Router) bool {
 	if bytes.Equal(r.name, another.name) && r.frontendApi.equal(another.frontendApi) &&
 		r.backendApi.equal(another.backendApi) && r.status == another.status && r.service.equal(another.service) &&
-		cmpPointerSlice(r.middleware, another.middleware) {
+		utils.CmpPointerSlice(r.middleware, another.middleware) {
 		return true
 	} else {
 		return false
@@ -603,9 +390,9 @@ func (r *Router) CheckStatus(must Status) bool {
 
 func (r *Router) key(attr ...string) string {
 	if len(attr) > 0 {
-		return RouterDefinition + fmt.Sprintf(RouterPrefixString, string(r.name)) + attr[0]
+		return constant.RouterDefinition + fmt.Sprintf(constant.RouterPrefixString, string(r.name)) + attr[0]
 	} else {
-		return RouterDefinition + fmt.Sprintf(RouterPrefixString, string(r.name))
+		return constant.RouterDefinition + fmt.Sprintf(constant.RouterPrefixString, string(r.name))
 	}
 }
 
@@ -630,27 +417,6 @@ func (s *Service) checkEndpointStatus(must Status) (confirm []*Endpoint, rest []
 	return confirm, rest
 }
 
-func (s *Service) AddEndpoint(ep *Endpoint) (bool, error) {
-	another, exists := s.ep.Load(ep.nameString)
-	if exists {
-		if ep.equal(another) {
-			return true, nil
-		} else {
-			return false, errors.New(122)
-		}
-	} else {
-		if ep.status == Online {
-			newNode := ring.New(1)
-			newNode.Value = ep.nameString
-			n := s.onlineEp.Link(newNode)
-			newNode.Link(n)
-		}
-		s.ep.Store(ep.nameString, ep)
-
-		return true, nil
-	}
-}
-
 func (s *Service) ResetOnlineEndpointRing(online []*Endpoint) error {
 	if len(online) == 0 {
 		return errors.New(144)
@@ -670,9 +436,9 @@ func (s *Service) ResetOnlineEndpointRing(online []*Endpoint) error {
 
 func (ep *Endpoint) key(attr ...string) string {
 	if len(attr) > 0 {
-		return NodeDefinition + fmt.Sprintf(NodePrefixString, ep.id) + attr[0]
+		return constant.NodeDefinition + fmt.Sprintf(constant.NodePrefixString, ep.id) + attr[0]
 	} else {
-		return NodeDefinition + fmt.Sprintf(NodePrefixString, ep.id)
+		return constant.NodeDefinition + fmt.Sprintf(constant.NodePrefixString, ep.id)
 	}
 }
 
@@ -689,82 +455,7 @@ func (ep *Endpoint) setStatus(status Status) {
 	ep.status = status
 }
 
-func (r *RoutingTable) HealthCheck() {
-	defer func() {
-		if err := recover(); err != nil {
-			stack := stack(3)
-			go golang_utils.ErrMail("dropshipping_mp_user err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
-			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack)
-		}
-	}()
-	for {
-		r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) {
-			var status Status
-			if value.status == Offline {
-				logger.Warningf("endpoints [%s] offline, skip health-check", value.nameString)
-				return
-			}
-			resp, err := r.getKeyValue(value.key(StatusKeyString))
-			if err != nil {
-				logger.Exception(err)
-				status = BreakDown
-			} else {
-				for _, kv := range resp.Kvs {
-					if bytes.Equal(kv.Key, []byte(value.key(StatusKeyString))) {
-						statusInt, err := strconv.ParseInt(string(kv.Value), 10, 64)
-						if err != nil {
-							logger.Exception(err)
-							status = BreakDown
-						} else {
-							status = Status(statusInt)
-						}
-					} else {
-						status = BreakDown
-					}
-				}
-			}
-			if check, err := value.healthCheck.Check(value.host, value.port); err == nil {
-				if check {
-					if status != Online {
-						r.SetEndpointStatus(value, Online)
-					}
-				} else {
-					if status != Offline {
-						r.SetEndpointStatus(value, Offline)
-					}
-				}
-			} else {
-				logger.Error(err.(errors.Error).String())
-				r.SetEndpointStatus(value, BreakDown)
-			}
-		})
-		r.routerTable.Range(func(key RouterNameString, value *Router) {
-			confirm, rest := value.service.checkEndpointStatus(Online)
-			if len(confirm) > 0 {
-				if value.status != Online {
-					r.SetRouterOnline(value)
-				}
-				if err := value.service.ResetOnlineEndpointRing(confirm); err != nil {
-					logger.Error(err.(errors.Error).String())
-				}
-			} else {
-				for _, i := range rest{
-					if i.status == BreakDown && value.status != BreakDown{
-						r.SetRouterStatus(value, BreakDown)
-						return
-					}
-				}
-				if value.status != Offline {
-					r.SetRouterStatus(value, Offline)
-				}
-			}
-		})
-
-		time.Sleep(time.Second * 10)
-	}
-}
-
-func (r *RoutingTable) Select(input []byte) (TargetServer, error) {
+func (r *Table) Select(input []byte) (TargetServer, error) {
 	var replacedBackendUri []byte
 	var matchRouter *Router
 
@@ -816,18 +507,6 @@ func (r *RoutingTable) Select(input []byte) (TargetServer, error) {
 	return TargetServer{}, errors.New(141)
 }
 
-func prefixFilter(input []byte) []byte {
-	ret := bytes.TrimPrefix(input, UriSlash)
-	if bytes.HasPrefix(ret, UriSlash) {
-		ret = prefixFilter(ret)
-	}
-	ret = bytes.TrimSuffix(ret, UriSlash)
-	if bytes.HasSuffix(ret, UriSlash) {
-		ret = prefixFilter(ret)
-	}
-	return ret
-}
-
 func match(input, pattern [][]byte, backend [][]byte) (bool, []byte) {
 	inputLen := len(input)
 	patternLen := len(pattern)
@@ -850,7 +529,7 @@ func match(input, pattern [][]byte, backend [][]byte) (bool, []byte) {
 				tmp = append(tmp, b)
 			}
 		}
-		return true, bytes.Join(tmp, SlashBytes)
+		return true, bytes.Join(tmp, constant.SlashBytes)
 	} else {
 		return false, nil
 	}

@@ -1,0 +1,30 @@
+package constant
+
+const (
+	Root                        = "/"
+	Slash                       = "/"
+	RouterDefinition            = "/Router/"
+	RouterPrefixString          = "Router-%s/"
+	ServiceDefinition           = "/Service/"
+	NodeDefinition              = "/Node/"
+	NodePrefixString            = "Node-%s/"
+	NodePrefixDefinition        = "/Node/Node-"
+	HealthCheckPrefixDefinition = "/HealthCheck/HC-"
+
+	IdKeyString             = "ID"
+	NameKeyString           = "Name"
+	ServiceKeyString = "Service"
+	HostKeyString           = "Host"
+	PortKeyString           = "Port"
+	StatusKeyString         = "Status"
+	HealthCheckKeyString    = "HealthCheck"
+	FrontendApiKeyString    = "FrontendApi"
+	BackendApiKeyString     = "BackendApi"
+	PathKeyString           = "Path"
+	TimeoutKeyString        = "Timeout"
+	IntervalKeyString       = "Interval"
+	RetryKeyString          = "Retry"
+	RetryTimeKeyString      = "RetryTime"
+	NodeKeyString           = "Node"
+	FailedTimesKeyString = "FailedTimes"
+)

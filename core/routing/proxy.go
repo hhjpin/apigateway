@@ -1,8 +1,9 @@
-package core
+package routing
 
 import (
 	"bytes"
 	"fmt"
+	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/go-ego/murmur"
@@ -11,11 +12,11 @@ import (
 	"time"
 )
 
-func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middleware) fasthttp.RequestHandler {
+func MainRequestHandlerWrapper(table *Table, middle ...middleware.Middleware) fasthttp.RequestHandler {
 	return fasthttp.TimeoutHandler(
 		func(ctx *fasthttp.RequestCtx) {
 			start := time.Now()
-			ctx.SetUserValue("RoutingTable", table)
+			ctx.SetUserValue("Table", table)
 			if len(middle) > 0 {
 				errChan := make(chan error, len(middle))
 				for _, m := range middle {
@@ -28,7 +29,7 @@ func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middlew
 					case <-timer.C:
 						ctx.Response.SetStatusCode(fasthttp.StatusOK)
 						ctx.Response.Header.Set("Server", "Api Gateway")
-						ctx.Response.Header.SetContentTypeBytes(strApplicationJson)
+						ctx.Response.Header.SetContentTypeBytes(constant.StrApplicationJson)
 						body := errors.New(5).MarshalEmptyData()
 						ctx.Response.SetBody(body)
 						go middleware.Logger(ctx.Response.StatusCode(), string(ctx.Request.URI().Path()), string(ctx.Request.Header.Method()), ctx.RemoteIP().String(), start)
@@ -37,7 +38,7 @@ func MainRequestHandlerWrapper(table *RoutingTable, middle ...middleware.Middlew
 						if e != nil {
 							ctx.Response.SetStatusCode(fasthttp.StatusOK)
 							ctx.Response.Header.Set("Server", "Api Gateway")
-							ctx.Response.Header.SetContentTypeBytes(strApplicationJson)
+							ctx.Response.Header.SetContentTypeBytes(constant.StrApplicationJson)
 							if err, ok := e.(errors.Error); ok {
 								ctx.Response.SetBody(err.MarshalEmptyData())
 								go middleware.Logger(ctx.Response.StatusCode(), string(ctx.Request.URI().Path()), string(ctx.Request.Header.Method()), ctx.RemoteIP().String(), start)
@@ -109,7 +110,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	}()
 
 	path := ctx.Path()
-	routingTable := ctx.UserValue("RoutingTable")
+	routingTable := ctx.UserValue("Table")
 
 	if routingTable == nil {
 		logger.Error("Routing Table not exists")
@@ -117,7 +118,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	rt, ok := routingTable.(*RoutingTable)
+	rt, ok := routingTable.(*Table)
 	if !ok {
 		logger.Error("wrong type of Routing Table")
 		ctx.Error(string(errors.New(7).MarshalEmptyData()), fasthttp.StatusInternalServerError)
@@ -140,7 +141,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	}
 
 	ctx.Request.Header.VisitAll(func(key, value []byte) {
-		if bytes.Equal(key, strHost) {
+		if bytes.Equal(key, constant.StrHost) {
 			// pass
 		} else {
 			revReq.Header.AddBytesKV(key, value)
@@ -172,7 +173,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	revRes.Header.VisitAll(func(key, value []byte) {
-		if bytes.Equal(key, strHost) {
+		if bytes.Equal(key, constant.StrHost) {
 			// pass
 		} else {
 			ctx.Response.Header.SetBytesKV(key, value)

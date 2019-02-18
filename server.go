@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/conf"
-	"git.henghajiang.com/backend/api_gateway_v2/core"
+	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
+	"git.henghajiang.com/backend/api_gateway_v2/core/watcher"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
@@ -21,7 +22,8 @@ type etcdPool struct {
 }
 
 var (
-	table    *core.RoutingTable
+	table    *routing.Table
+	watchers map[watcher.Watcher]clientv3.WatchChan
 	EtcdPool = etcdPool{}
 
 	logger = log.New()
@@ -75,15 +77,15 @@ func ConnectToEtcd() *clientv3.Client {
 
 func init() {
 	etcdCli := ConnectToEtcd()
-	table = core.InitRoutingTable(etcdCli)
-	ctx := context.Background()
-	routerCh := etcdCli.Watch(ctx, "/Router", clientv3.WithPrefix())
-	svrCh := etcdCli.Watch(ctx, "/Service", clientv3.WithPrefix())
-	epCh := etcdCli.Watch(ctx, "/Node", clientv3.WithPrefix())
-	heathCh := etcdCli.Watch(ctx, "/HealthCheck", clientv3.WithPrefix())
+	table = routing.InitRoutingTable(etcdCli)
 
+	routeWatcher := watcher.NewRouteWatcher(etcdCli, context.Background())
+
+	routeWatcher.BindTable(table)
+
+	watchers[routeWatcher] = routeWatcher.WatchChan
 	go table.HealthCheck()
-	go core.RouterWatcher(routerCh)
+	go watcher.Watch(watchers)
 }
 
 func main() {
@@ -93,7 +95,7 @@ func main() {
 
 	serverConf := conf.Conf.Server
 	server = &fasthttp.Server{
-		Handler: core.MainRequestHandlerWrapper(table, middleware.Limiter),
+		Handler: routing.MainRequestHandlerWrapper(table, middleware.Limiter),
 
 		Name:               serverConf.Name,
 		Concurrency:        serverConf.Concurrency,
