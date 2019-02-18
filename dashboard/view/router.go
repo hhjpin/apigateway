@@ -10,7 +10,7 @@ func RouterList(c *gin.Context) {
 	var resp BaseResponse
 	var request struct {
 		Offset int `json:"offset"`
-		Limit int `json:"limit"`
+		Limit  int `json:"limit"`
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -19,6 +19,5 @@ func RouterList(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, resp)
 		return
 	}
-
 
 }

@@ -20,16 +20,16 @@ type RouteWatcher struct {
 
 func NewRouteWatcher(cli *clientv3.Client, ctx context.Context) *RouteWatcher {
 	w := &RouteWatcher{
-		cli: cli,
-		prefix:    routeWatcherPrefix,
-		attrs:     []string{"BackendApi", "FrontendApi", "ID", "Name", "Service", "Status"},
+		cli:    cli,
+		prefix: routeWatcherPrefix,
+		attrs:  []string{"BackendApi", "FrontendApi", "ID", "Name", "Service", "Status"},
 	}
 	w.WatchChan = cli.Watch(ctx, w.prefix, clientv3.WithPrefix())
 	return w
 }
 
-func (r *RouteWatcher)Put(kv *mvccpb.KeyValue, isCreate bool) error {
-	route := strings.TrimPrefix(string(kv.Key), r.prefix + "Router-")
+func (r *RouteWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
+	route := strings.TrimPrefix(string(kv.Key), r.prefix+"Router-")
 	tmp := strings.Split(route, slash)
 	if len(tmp) < 2 {
 		logger.Warningf("invalid router key: %s", string(kv.Key))
@@ -39,7 +39,7 @@ func (r *RouteWatcher)Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	logger.Debugf("route name: %s", routeName)
 
 	if isCreate {
-		if ok, err := validKV(r.cli, r.prefix + fmt.Sprintf("Router-%s/", routeName), r.attrs, false); err != nil || !ok {
+		if ok, err := validKV(r.cli, r.prefix+fmt.Sprintf("Router-%s/", routeName), r.attrs, false); err != nil || !ok {
 			logger.Warningf("new route lack attribute, it may not have been created yet. Suggest to wait")
 			return nil
 		} else {
@@ -58,8 +58,8 @@ func (r *RouteWatcher)Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 }
 
-func (r *RouteWatcher)Delete(kv *mvccpb.KeyValue) error {
-	route := strings.TrimPrefix(string(kv.Key), r.prefix + "Router-")
+func (r *RouteWatcher) Delete(kv *mvccpb.KeyValue) error {
+	route := strings.TrimPrefix(string(kv.Key), r.prefix+"Router-")
 	tmp := strings.Split(route, slash)
 	if len(tmp) < 2 {
 		logger.Warningf("invalid router key: %s", string(kv.Key))
@@ -67,7 +67,7 @@ func (r *RouteWatcher)Delete(kv *mvccpb.KeyValue) error {
 	}
 	routeName := tmp[0]
 	logger.Debugf("route name: %s", routeName)
-	if ok, err := validKV(r.cli, r.prefix + fmt.Sprintf("Router-%s/", routeName), r.attrs, true); err != nil || !ok {
+	if ok, err := validKV(r.cli, r.prefix+fmt.Sprintf("Router-%s/", routeName), r.attrs, true); err != nil || !ok {
 		logger.Warningf("route attribute still exists, it may not have been deleted yet. Suggest to wait")
 		return nil
 	} else {
@@ -79,15 +79,15 @@ func (r *RouteWatcher)Delete(kv *mvccpb.KeyValue) error {
 	}
 }
 
-func (r *RouteWatcher)BindTable(table *routing.Table) {
+func (r *RouteWatcher) BindTable(table *routing.Table) {
 	r.table = table
 }
 
-func (r *RouteWatcher)GetTable() *routing.Table {
+func (r *RouteWatcher) GetTable() *routing.Table {
 	return r.table
 }
 
-func (r *RouteWatcher)RefreshRouter(name string, eventType mvccpb.Event_EventType) error {
+func (r *RouteWatcher) RefreshRouter(name string, eventType mvccpb.Event_EventType) error {
 	switch eventType {
 	case mvccpb.PUT:
 		if err := r.table.RefreshRouter(name); err != nil {
@@ -105,4 +105,3 @@ func (r *RouteWatcher)RefreshRouter(name string, eventType mvccpb.Event_EventTyp
 	}
 	return nil
 }
-

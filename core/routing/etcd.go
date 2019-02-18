@@ -396,7 +396,7 @@ func (r *Table) CreateRouter(name string) error {
 	}
 	router := &Router{}
 	for _, kv := range resp.Kvs {
-		key := bytes.TrimPrefix(kv.Key, []byte(constant.RouterDefinition + fmt.Sprintf(constant.RouterPrefixString, name)))
+		key := bytes.TrimPrefix(kv.Key, []byte(constant.RouterDefinition+fmt.Sprintf(constant.RouterPrefixString, name)))
 		if bytes.Contains(key, constant.SlashBytes) {
 			logger.Warningf("invalid router attribute key")
 			return errors.NewFormat(200, "invalid router attribute key")
@@ -473,7 +473,7 @@ func (r *Table) RefreshRouter(name string) error {
 		return errors.New(132)
 	}
 	for _, kv := range resp.Kvs {
-		key := bytes.TrimPrefix(kv.Key, []byte(constant.RouterDefinition + fmt.Sprintf(constant.RouterPrefixString, name)))
+		key := bytes.TrimPrefix(kv.Key, []byte(constant.RouterDefinition+fmt.Sprintf(constant.RouterPrefixString, name)))
 		if bytes.Contains(key, constant.SlashBytes) {
 			logger.Warningf("invalid router attribute key")
 			return errors.NewFormat(200, "invalid router attribute key")

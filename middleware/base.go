@@ -42,7 +42,6 @@ func init() {
 	}
 }
 
-
 func function(pc uintptr) []byte {
 	fn := runtime.FuncForPC(pc)
 	if fn == nil {
@@ -96,4 +95,3 @@ func stack(skip int) []byte {
 	}
 	return buf.Bytes()
 }
-

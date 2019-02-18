@@ -289,12 +289,12 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 		}
 		kvs[hcDefinition+RetryTimeKey] = strconv.FormatUint(uint64(hc.RetryTime), 10)
 	} else {
-		id := gw.getAttr(hcDefinition+IDKey)
-		path := gw.getAttr(hcDefinition+PathKey)
-		timeout := gw.getAttr(hcDefinition+TimeoutKey)
-		interval := gw.getAttr(hcDefinition+IntervalKey)
-		retry := gw.getAttr(hcDefinition+RetryKey)
-		retryTime := gw.getAttr(hcDefinition+RetryTimeKey)
+		id := gw.getAttr(hcDefinition + IDKey)
+		path := gw.getAttr(hcDefinition + PathKey)
+		timeout := gw.getAttr(hcDefinition + TimeoutKey)
+		interval := gw.getAttr(hcDefinition + IntervalKey)
+		retry := gw.getAttr(hcDefinition + RetryKey)
+		retryTime := gw.getAttr(hcDefinition + RetryTimeKey)
 		if id != hc.ID {
 			kvs[hcDefinition+IDKey] = hc.ID
 		}

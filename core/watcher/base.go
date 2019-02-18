@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	routeWatcherPrefix = "/Router/"
-	serviceWatcherPrefix = "/Service/"
-	endpointWatcherPrefix = "/Node/"
+	routeWatcherPrefix       = "/Router/"
+	serviceWatcherPrefix     = "/Service/"
+	endpointWatcherPrefix    = "/Node/"
 	healthCheckWatcherPrefix = "/HealthCheck/"
 
 	slash = "/"
@@ -42,7 +42,7 @@ func init() {
 func validKV(cli *clientv3.Client, prefix string, attrs []string, not bool) (bool, error) {
 	for _, attr := range attrs {
 		ctx := context.Background()
-		resp, err := cli.Get(ctx, prefix + attr)
+		resp, err := cli.Get(ctx, prefix+attr)
 		if err != nil {
 			return false, err
 		}

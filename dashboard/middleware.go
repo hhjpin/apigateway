@@ -33,7 +33,7 @@ var (
 func ConnectToEtcd() *clientv3.Client {
 	cli, err := clientv3.New(
 		clientv3.Config{
-			Endpoints:            []string{"127.0.0.1:2379"},
+			Endpoints: []string{"127.0.0.1:2379"},
 		},
 	)
 	if err != nil {

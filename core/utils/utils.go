@@ -196,4 +196,3 @@ func Stack(skip int) []byte {
 	}
 	return buf.Bytes()
 }
-

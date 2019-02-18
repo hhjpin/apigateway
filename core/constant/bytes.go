@@ -37,7 +37,7 @@ var (
 
 	//StrResponseContinue = []byte("HTTP/1.1 100 Continue\r\n\r\n")
 
-	StrGet    = []byte("GET")
+	StrGet = []byte("GET")
 	//StrHead   = []byte("HEAD")
 	//StrPost   = []byte("POST")
 	//StrPut    = []byte("PUT")
@@ -48,7 +48,7 @@ var (
 	//StrContentLength    = []byte("Content-Length")
 	//StrContentType      = []byte("Content-Type")
 	//StrDate             = []byte("Date")
-	StrHost             = []byte("Host")
+	StrHost = []byte("Host")
 	//StrReferer          = []byte("Referer")
 	//StrServer           = []byte("Server")
 	//StrTransferEncoding = []byte("Transfer-Encoding")
@@ -85,5 +85,5 @@ var (
 	//StrBytes               = []byte("bytes")
 	//StrTextSlash           = []byte("text/")
 	//StrApplicationSlash    = []byte("application/")
-	StrApplicationJson     = []byte("application/json")
+	StrApplicationJson = []byte("application/json")
 )

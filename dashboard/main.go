@@ -14,8 +14,8 @@ import (
 
 var (
 	etcdClient *clientv3.Client
-	logger = log.New()
-	flagPort    = flag.Int("port", 80, "server listening port")
+	logger     = log.New()
+	flagPort   = flag.Int("port", 80, "server listening port")
 )
 
 func init() {
@@ -68,4 +68,3 @@ func main() {
 		os.Exit(-1)
 	}
 }
-

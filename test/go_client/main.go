@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	logger = log.New()
+	logger   = log.New()
 	flagPort = flag.Int("port", 7789, "server listening port")
 )
 

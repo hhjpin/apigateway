@@ -57,7 +57,6 @@ func (h *HealthCheck) Check(host []byte, port int) (bool, error) {
 	}
 }
 
-
 func (r *Table) HealthCheck() {
 	defer func() {
 		if err := recover(); err != nil {
@@ -116,8 +115,8 @@ func (r *Table) HealthCheck() {
 					logger.Error(err.(errors.Error).String())
 				}
 			} else {
-				for _, i := range rest{
-					if i.status == BreakDown && value.status != BreakDown{
+				for _, i := range rest {
+					if i.status == BreakDown && value.status != BreakDown {
 						_, _ = r.SetRouterStatus(value, BreakDown)
 						return
 					}
