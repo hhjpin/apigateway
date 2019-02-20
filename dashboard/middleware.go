@@ -83,7 +83,9 @@ func stack(skip int) []byte {
 			break
 		}
 
-		fmt.Fprintf(buf, "%s:%d (0x%x)\n", file, line, pc)
+		if _, err := fmt.Fprintf(buf, "%s:%d (0x%x)\n", file, line, pc); err != nil {
+			logger.Exception(err)
+		}
 		if file != lastFile {
 			data, err := ioutil.ReadFile(file)
 			if err != nil {
@@ -92,7 +94,9 @@ func stack(skip int) []byte {
 			lines = bytes.Split(data, []byte{'\n'})
 			lastFile = file
 		}
-		fmt.Fprintf(buf, "\t%s: %s\n", function(pc), source(lines, line))
+		if _, err := fmt.Fprintf(buf, "\t%s: %s\n", function(pc), source(lines, line)); err != nil {
+			logger.Exception(err)
+		}
 	}
 	return buf.Bytes()
 }
@@ -213,7 +217,7 @@ func LoggerWithWriter(out io.Writer, notLogged ...string) gin.HandlerFunc {
 			if raw != "" {
 				path = path + "?" + raw
 			}
-			fmt.Fprintf(out, "\033[0;32m[GIN]\033[0m    %v |%s %3d \033[0m| \033[1;32m%13v\033[0m | %15s |%s %-7s \033[0m %s %s \033[0m \n",
+			_, err := fmt.Fprintf(out, "\033[0;32m[GIN]\033[0m    %v |%s %3d \033[0m| \033[1;32m%13v\033[0m | %15s |%s %-7s \033[0m %s %s \033[0m \n",
 				end.Format("2006/01/02 15:04:05"),
 				statusColor, statusCode,
 				latency,
@@ -221,6 +225,9 @@ func LoggerWithWriter(out io.Writer, notLogged ...string) gin.HandlerFunc {
 				methodColor, method,
 				lightCyan, path,
 			)
+			if err != nil {
+				logger.Exception(err)
+			}
 		}
 	}
 }

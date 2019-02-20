@@ -82,7 +82,9 @@ func stack(skip int) []byte {
 			break
 		}
 
-		fmt.Fprintf(buf, "%s:%d (0x%x)\n", file, line, pc)
+		if _, err := fmt.Fprintf(buf, "%s:%d (0x%x)\n", file, line, pc); err != nil {
+			logger.Exception(err)
+		}
 		if file != lastFile {
 			data, err := ioutil.ReadFile(file)
 			if err != nil {
@@ -91,7 +93,9 @@ func stack(skip int) []byte {
 			lines = bytes.Split(data, []byte{'\n'})
 			lastFile = file
 		}
-		fmt.Fprintf(buf, "\t%s: %s\n", function(pc), source(lines, line))
+		if _, err := fmt.Fprintf(buf, "\t%s: %s\n", function(pc), source(lines, line)); err != nil {
+			logger.Exception(err)
+		}
 	}
 	return buf.Bytes()
 }

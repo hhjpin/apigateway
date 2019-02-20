@@ -117,14 +117,16 @@ func ReadConfig(path ...string) *Config {
 		}
 	}
 	f, err = os.OpenFile(configFilePath, os.O_RDONLY, 0666)
-	defer f.Close()
+	defer func(fd *os.File) {if err := f.Close(); err != nil {panic(err)}}(f)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	length, _ := f.Seek(0, 2)
 	conf := make([]byte, length)
-	f.Seek(0, 0)
+	if _, err := f.Seek(0, 0); err != nil {
+		panic(err)
+	}
 	_, err = f.Read(conf)
 	if err != nil {
 		log.Fatal(err)

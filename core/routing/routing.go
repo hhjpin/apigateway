@@ -172,6 +172,27 @@ func (r *Table) GetServiceByName(name []byte) (*Service, error) {
 	return svr, nil
 }
 
+func (r *Table) GetEndpointByName(name []byte) (*Endpoint, error) {
+	ep, exists := r.endpointTable.Load(EndpointNameString(name))
+	if !exists {
+		logger.Warningf("can not find endpoint by name: %s", EndpointNameString(name))
+		return nil, errors.New(139)
+	}
+	return ep, nil
+}
+
+func (r *Table) GetEndpointById(id string) (*Endpoint, error) {
+	var ep *Endpoint
+	r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) bool {
+		if value.id == id {
+			ep = value
+			return true
+		}
+		return false
+	})
+	return ep, nil
+}
+
 func (r *Table) RemoveRouter(router *Router) (ok bool, err error) {
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
@@ -407,12 +428,13 @@ func (s *Service) equal(another *Service) bool {
 // check status of all endpoint under the same service, `must` means must-condition status, return the rest endpoint
 // which not confirmed to the must-condition
 func (s *Service) checkEndpointStatus(must Status) (confirm []*Endpoint, rest []*Endpoint) {
-	s.ep.Range(func(key EndpointNameString, value *Endpoint) {
+	s.ep.Range(func(key EndpointNameString, value *Endpoint) bool {
 		if value.status != must {
 			rest = append(rest, value)
 		} else {
 			confirm = append(confirm, value)
 		}
+		return false
 	})
 	return confirm, rest
 }

@@ -39,7 +39,9 @@ func init() {
 			golang.NewRouter("test3", "/rd", "/redirect", svr),
 		},
 	)
-	gw.Register()
+	if err := gw.Register(); err != nil {
+		logger.Exception(err)
+	}
 }
 
 func ConnectToEtcd() *clientv3.Client {
@@ -73,5 +75,7 @@ func main() {
 		c.Redirect(308, "http://127.0.0.1/test/redirect")
 	})
 
-	r.Run(fmt.Sprintf(":%d", *flagPort))
+	if err := r.Run(fmt.Sprintf(":%d", *flagPort)); err != nil {
+		logger.Exception(err)
+	}
 }

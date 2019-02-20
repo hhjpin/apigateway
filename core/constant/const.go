@@ -1,15 +1,16 @@
 package constant
 
 const (
-	Root                        = "/"
 	Slash                       = "/"
 	RouterDefinition            = "/Router/"
 	RouterPrefixString          = "Router-%s/"
 	ServiceDefinition           = "/Service/"
+	ServicePrefixString         = "Service-%s/"
 	NodeDefinition              = "/Node/"
 	NodePrefixString            = "Node-%s/"
 	NodePrefixDefinition        = "/Node/Node-"
 	HealthCheckPrefixDefinition = "/HealthCheck/HC-"
+	HealthCheckPrefixString = "HC-%s/"
 
 	IdKeyString          = "ID"
 	NameKeyString        = "Name"

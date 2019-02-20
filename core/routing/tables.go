@@ -129,10 +129,13 @@ func (m *EndpointTableMap) Store(key EndpointNameString, value *Endpoint) {
 	m.Unlock()
 }
 
-func (m *EndpointTableMap) Range(f func(key EndpointNameString, value *Endpoint)) {
+func (m *EndpointTableMap) Range(f func(key EndpointNameString, value *Endpoint) bool) {
 	m.RLock()
 	for k, v := range m.internal {
-		f(k, v)
+		ok := f(k, v)
+		if ok {
+			break
+		}
 	}
 	m.RUnlock()
 }
@@ -204,6 +207,17 @@ func (m *ServiceTableMap) Store(key ServiceNameString, value *Service) {
 	m.Lock()
 	m.internal[key] = value
 	m.Unlock()
+}
+
+func (m *ServiceTableMap) Range(f func(key ServiceNameString, value *Service) bool) {
+	m.RLock()
+	for k, v := range m.internal {
+		ret := f(k, v)
+		if ret {
+			break
+		}
+	}
+	m.RUnlock()
 }
 
 func (m *ServiceTableMap) unsafeRange(f func(key ServiceNameString, value *Service)) {

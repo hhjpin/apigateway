@@ -63,7 +63,7 @@ func Logger(code int, path, method, clientIP string, start time.Time) {
 	statusColor = colorForStatus(code)
 	methodColor = colorForMethod(method)
 
-	fmt.Fprintf(os.Stdout, "\033[0;32m[GW]\033[0m    %v |%s %3d \033[0m| \033[1;32m%13v\033[0m | %15s |%s %-7s \033[0m %s %s \033[0m \n",
+	_, err := fmt.Fprintf(os.Stdout, "\033[0;32m[GW]\033[0m    %v |%s %3d \033[0m| \033[1;32m%13v\033[0m | %15s |%s %-7s \033[0m %s %s \033[0m \n",
 		end.Format("2006/01/02 15:04:05"),
 		statusColor, code,
 		latency,
@@ -71,4 +71,7 @@ func Logger(code int, path, method, clientIP string, start time.Time) {
 		methodColor, method,
 		lightCyan, path,
 	)
+	if err != nil {
+		logger.Exception(err)
+	}
 }

@@ -41,7 +41,7 @@ func (h *HealthCheck) Check(host []byte, port int) (bool, error) {
 
 	revReq.SetRequestURIBytes(revReqUri.FullURI())
 	revReq.Header.SetMethodBytes(constant.StrGet)
-
+	logger.Debugf("health check request: %s", string(revReqUri.FullURI()))
 	err := fasthttp.Do(revReq, revRes)
 	if err != nil {
 		logger.Exception(err)
@@ -65,11 +65,11 @@ func (r *Table) HealthCheck() {
 		}
 	}()
 	for {
-		r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) {
+		r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) bool {
 			var status Status
 			if value.status == Offline {
 				logger.Warningf("endpoints [%s] offline, skip health-check", value.nameString)
-				return
+				return false
 			}
 			resp, err := utils.GetKV(r.cli, value.key(constant.StatusKeyString))
 			if err != nil {
@@ -97,13 +97,14 @@ func (r *Table) HealthCheck() {
 					}
 				} else {
 					if status != Offline {
-						_ = r.SetEndpointStatus(value, Offline)
+						_ = r.SetEndpointStatus(value, BreakDown)
 					}
 				}
 			} else {
 				logger.Error(err.(errors.Error).String())
 				_ = r.SetEndpointStatus(value, BreakDown)
 			}
+			return false
 		})
 		r.routerTable.Range(func(key RouterNameString, value *Router) {
 			confirm, rest := value.service.checkEndpointStatus(Online)

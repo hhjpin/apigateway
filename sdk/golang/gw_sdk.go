@@ -81,10 +81,10 @@ func NewNode(name, host string, port int, hc *HealthCheck) *Node {
 	hc.ID = uid
 	return &Node{
 		ID:     uid,
-		Name:   name + ":" + uid,
+		Name:   uid,
 		Host:   host,
 		Port:   port,
-		Status: 0,
+		Status: 2,
 		HC:     hc,
 	}
 }

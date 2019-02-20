@@ -80,10 +80,19 @@ func init() {
 	table = routing.InitRoutingTable(etcdCli)
 
 	routeWatcher := watcher.NewRouteWatcher(etcdCli, context.Background())
-
 	routeWatcher.BindTable(table)
+	serviceWatcher := watcher.NewServiceWatcher(etcdCli, context.Background())
+	serviceWatcher.BindTable(table)
+	endpointWatcher := watcher.NewEndpointWatcher(etcdCli, context.Background())
+	endpointWatcher.BindTable(table)
+	healthCheckWatcher := watcher.NewHealthCheckWatcher(etcdCli, context.Background())
+	healthCheckWatcher.BindTable(table)
 
+	watchers := make(map[watcher.Watcher]clientv3.WatchChan)
 	watchers[routeWatcher] = routeWatcher.WatchChan
+	watchers[serviceWatcher] = serviceWatcher.WatchChan
+	watchers[endpointWatcher] = endpointWatcher.WatchChan
+	watchers[healthCheckWatcher] = healthCheckWatcher.WatchChan
 	go table.HealthCheck()
 	go watcher.Watch(watchers)
 }
