@@ -732,17 +732,17 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 			} else {
 				ep.healthCheck = hc
 			}
-			if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil {
-				ep.setStatus(BreakDown)
-			} else if !ok && err == nil {
-				ep.setStatus(Offline)
-			} else {
-				ep.setStatus(Online)
-			}
 		default:
 			logger.Errorf("unsupported service attribute: %s", keyStr)
 			return errors.NewFormat(200, fmt.Sprintf("unsupported service attribute: %s", keyStr))
 		}
+	}
+	if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil {
+		ep.setStatus(Offline)
+	} else if !ok && err == nil {
+		ep.setStatus(BreakDown)
+	} else {
+		ep.setStatus(Online)
 	}
 	r.endpointTable.Store(ep.nameString, ep)
 
@@ -859,17 +859,17 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 			} else {
 				ep.healthCheck = hc
 			}
-			if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil {
-				ep.setStatus(BreakDown)
-			} else if !ok && err == nil {
-				ep.setStatus(Offline)
-			} else {
-				ep.setStatus(Online)
-			}
 		default:
 			logger.Errorf("unsupported service attribute: %s", keyStr)
 			return errors.NewFormat(200, fmt.Sprintf("unsupported service attribute: %s", keyStr))
 		}
+	}
+	if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil {
+		ep.setStatus(Offline)
+	} else if !ok && err == nil {
+		ep.setStatus(BreakDown)
+	} else {
+		ep.setStatus(Online)
 	}
 	r.endpointTable.Store(ep.nameString, ep)
 

@@ -257,6 +257,7 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 		if healthCheck != n.HC.ID {
 			kvs[nodeDefinition+HealthCheckKey] = n.HC.ID
 		}
+		kvs[nodeDefinition + StatusKey] = "2"
 		if len(kvs) > 0 {
 			logger.Infof("node keys waiting to be updated: %+v", kvs)
 		}

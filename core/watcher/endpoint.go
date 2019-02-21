@@ -22,7 +22,7 @@ func NewEndpointWatcher(cli *clientv3.Client, ctx context.Context) *EndpointWatc
 	ep := &EndpointWatcher{
 		cli:    cli,
 		prefix: endpointWatcherPrefix,
-		attrs:  []string{"ID", "Name", "Port", "Host", "HealthCheck"},
+		attrs:  []string{"ID", "Name", "Port", "Host"},
 	}
 	ep.WatchChan = cli.Watch(ctx, ep.prefix, clientv3.WithPrefix())
 	return ep
@@ -42,7 +42,7 @@ func (ep *EndpointWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 
 	if isCreate {
 		if ok, err := validKV(ep.cli, endpointKey, ep.attrs, false); err != nil || !ok {
-			logger.Warningf("new route lack attribute, it may not have been created yet. Suggest to wait")
+			logger.Warningf("new endpoint lack attribute, it may not have been created yet. Suggest to wait")
 			return nil
 		} else {
 			if err := ep.table.RefreshEndpoint(endpointId, endpointKey); err != nil {
@@ -73,7 +73,7 @@ func (ep *EndpointWatcher) Delete(kv *mvccpb.KeyValue) error {
 	logger.Debugf("endpoint key: %s", endpointKey)
 
 	if ok, err := validKV(ep.cli, endpointKey, ep.attrs, true); err != nil || !ok {
-		logger.Warningf("route attribute still exists, it may not have been deleted yet. Suggest to wait")
+		logger.Warningf("endpoint attribute still exists, it may not have been deleted yet. Suggest to wait")
 		return nil
 	} else {
 		if err := ep.table.DeleteEndpoint(endpointId); err != nil {

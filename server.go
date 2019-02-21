@@ -88,7 +88,7 @@ func init() {
 	healthCheckWatcher := watcher.NewHealthCheckWatcher(etcdCli, context.Background())
 	healthCheckWatcher.BindTable(table)
 
-	watchers := make(map[watcher.Watcher]clientv3.WatchChan)
+	watchers = make(map[watcher.Watcher]clientv3.WatchChan)
 	watchers[routeWatcher] = routeWatcher.WatchChan
 	watchers[serviceWatcher] = serviceWatcher.WatchChan
 	watchers[endpointWatcher] = endpointWatcher.WatchChan
