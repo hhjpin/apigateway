@@ -19,7 +19,7 @@ var (
 
 func init() {
 	flag.Parse()
-	node := golang.NewNode("localhost", "127.0.0.1", *flagPort, golang.NewHealthCheck(
+	node := golang.NewNode("127.0.0.1", *flagPort, golang.NewHealthCheck(
 		"/check",
 		10,
 		5,

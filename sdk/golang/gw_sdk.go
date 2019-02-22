@@ -68,7 +68,7 @@ func NewHealthCheck(path string, timeout, interval, retryTime uint8, retry bool)
 	}
 }
 
-func NewNode(name, host string, port int, hc *HealthCheck) *Node {
+func NewNode(host string, port int, hc *HealthCheck) *Node {
 	var uid string
 
 	hardwareAddr := GetHardwareAddressAsLong()

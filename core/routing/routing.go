@@ -328,7 +328,7 @@ func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 		}
 		if resp.Count == 0 {
 			if _, err := utils.PutKV(r.cli, ep.key(constant.FailedTimesKeyString), "1"); err != nil {
-
+				logger.Exception(err)
 			}
 		} else {
 			failedTimes, err = strconv.ParseInt(string(resp.Kvs[0].Value), 10, 64)
