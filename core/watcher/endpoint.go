@@ -37,6 +37,7 @@ func (ep *EndpointWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 	endpointId := tmp[0]
 	endpointKey := ep.prefix + fmt.Sprintf("Node-%s/", endpointId)
+	logger.Infof("新的Endpoint写入事件")
 	logger.Debugf("endpoint id: %s", endpointId)
 	logger.Debugf("endpoint key: %s", endpointKey)
 
@@ -69,6 +70,7 @@ func (ep *EndpointWatcher) Delete(kv *mvccpb.KeyValue) error {
 	}
 	endpointId := tmp[0]
 	endpointKey := ep.prefix + fmt.Sprintf("Node-%s/", endpointId)
+	logger.Infof("新的Endpoint删除事件")
 	logger.Debugf("endpoint id: %s", endpointId)
 	logger.Debugf("endpoint key: %s", endpointKey)
 

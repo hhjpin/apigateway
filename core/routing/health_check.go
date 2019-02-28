@@ -41,19 +41,15 @@ func (h *HealthCheck) Check(host []byte, port int) (bool, error) {
 
 	revReq.SetRequestURIBytes(revReqUri.FullURI())
 	revReq.Header.SetMethodBytes(constant.StrGet)
-	logger.Debugf("health check request: %s", string(revReqUri.FullURI()))
+	logger.Debugf("健康检查请求: %s", string(revReqUri.FullURI()))
 	err := fasthttp.Do(revReq, revRes)
 	if err != nil {
-		logger.Exception(err)
-		return false, errors.New(161)
+		return false, errors.NewFormat(162, err.Error())
 	}
 	if statusCode := revRes.StatusCode(); statusCode >= 200 && statusCode < 400 {
 		return true, nil
 	} else {
-		return false, errors.New(161, errors.CustomErrMsg{
-			ErrMsg:   fmt.Sprintf("%s 健康检查失败, 返回状态码 [%d]", string(tmpHost), statusCode),
-			ErrMsgEn: fmt.Sprintf("%s health check failed, status code [%d]", string(tmpHost), statusCode),
-		})
+		return false, errors.NewFormat(162, fmt.Sprintf("服务Host %s, 返回状态码 [%d]", string(tmpHost), statusCode))
 	}
 }
 
@@ -63,6 +59,7 @@ func (r *Table) HealthCheck() {
 			stack := utils.Stack(3)
 			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", utils.TimeFormat(time.Now()), err, stack)
 		}
+		go r.HealthCheck()
 	}()
 	for {
 		r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) bool {

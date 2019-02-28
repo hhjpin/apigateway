@@ -257,7 +257,7 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 		if healthCheck != n.HC.ID {
 			kvs[nodeDefinition+HealthCheckKey] = n.HC.ID
 		}
-		kvs[nodeDefinition + StatusKey] = "2"
+		kvs[nodeDefinition+StatusKey] = "2"
 		if len(kvs) > 0 {
 			logger.Infof("node keys waiting to be updated: %+v", kvs)
 		}
@@ -485,6 +485,30 @@ func (gw *ApiGatewayRegistrant) Register() error {
 	}
 	if err := gw.registerRouter(); err != nil {
 		logger.Exception(err)
+	}
+	return nil
+}
+
+func (gw *ApiGatewayRegistrant) Unregister() error {
+	var kvs map[string]interface{}
+	kvs = make(map[string]interface{})
+
+	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
+	resp, err := gw.getKeyValueWithPrefix(nodeDefinition)
+	if err != nil {
+		logger.Exception(err)
+		return err
+	}
+	if resp.Count == 0 {
+		kvs[nodeDefinition+StatusKey] = strconv.FormatUint(uint64(2), 10)
+	} else {
+		kvs[nodeDefinition+StatusKey] = "2"
+	}
+
+	err = gw.putMany(kvs)
+	if err != nil {
+		logger.Exception(err)
+		return err
 	}
 	return nil
 }

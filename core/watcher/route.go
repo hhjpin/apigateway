@@ -37,9 +37,9 @@ func (r *RouteWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 	routeName := tmp[0]
 	routeKey := r.prefix + fmt.Sprintf("Router-%s/", routeName)
+	logger.Infof("新的Router写入事件")
 	logger.Debugf("route name: %s", routeName)
 	logger.Debugf("route key: %s", routeKey)
-
 	if isCreate {
 		if ok, err := validKV(r.cli, routeKey, r.attrs, false); err != nil || !ok {
 			logger.Warningf("new route lack attribute, it may not have been created yet. Suggest to wait")
@@ -69,6 +69,7 @@ func (r *RouteWatcher) Delete(kv *mvccpb.KeyValue) error {
 	}
 	routeName := tmp[0]
 	routeKey := r.prefix + fmt.Sprintf("Router-%s/", routeName)
+	logger.Infof("新的Router删除事件")
 	logger.Debugf("route name: %s", routeName)
 	logger.Debugf("route key: %s", routeKey)
 

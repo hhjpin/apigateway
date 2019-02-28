@@ -46,6 +46,7 @@ func (s *ServiceWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 	svrName := tmp[0]
 	svrKey := s.prefix + fmt.Sprintf(constant.ServicePrefixString, svrName)
+	logger.Infof("新的Service写入事件")
 	logger.Debugf("service name: %s", svrName)
 	logger.Debugf("service key: %s", svrKey)
 
@@ -78,6 +79,7 @@ func (s *ServiceWatcher) Delete(kv *mvccpb.KeyValue) error {
 	}
 	svrName := tmp[0]
 	svrKey := s.prefix + fmt.Sprintf(constant.ServicePrefixString, svrName)
+	logger.Infof("新的Service删除事件")
 	logger.Debugf("service name: %s", svrName)
 	logger.Debugf("service key: %s", svrKey)
 	if ok, err := validKV(s.cli, svrKey, s.attrs, true); err != nil || !ok {

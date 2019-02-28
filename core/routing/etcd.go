@@ -216,6 +216,8 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 			default:
 				return nil, errors.New(150)
 			}
+		} else if bytes.Equal(key, []byte(constant.FailedTimesKeyString)) {
+			// do nothing
 		} else if bytes.Equal(key, constant.HealthCheckKeyBytes) {
 			// get health check info
 			respA, err := utils.GetPrefixKV(cli, constant.HealthCheckPrefixDefinition+string(kv.Value), clientv3.WithPrefix())
@@ -460,7 +462,7 @@ func (r *Table) RefreshRouter(name string, key string) error {
 		// if router is online now, it will not be refreshed
 		// TODO: trigger alarm
 
-		return errors.New(132)
+		//return errors.New(132)
 	}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, []byte(key))
@@ -654,14 +656,24 @@ func (r *Table) RefreshService(name string, key string) error {
 			// service connected
 			logger.Debugf("current router service: %+v", value.service)
 			value.service = ori
-			if status := value.CheckStatus(Online); status {
-				value.setStatus(Online)
-				if _, ok := r.onlineTable.Load(value.frontendApi); ok {
-					// router has no available service but exists in online api table
-					logger.Warningf("router has no available service but exists in online api table")
-				} else {
+			if ok := value.CheckStatus(Online); ok {
+				if _, err := r.SetRouterOnline(value); err != nil {
+					return
+				}
+				if _, ok := r.onlineTable.Load(value.frontendApi); !ok {
 					r.onlineTable.Store(value.frontendApi, value)
 				}
+			} else {
+				if _, err := r.SetRouterStatus(value, BreakDown); err != nil {
+					logger.Exception(err)
+					return
+				}
+				if _, ok := r.onlineTable.Load(value.frontendApi); !ok {
+					r.onlineTable.Delete(value.frontendApi)
+				}
+			}
+			if err := r.RefreshRouter(string(value.name), fmt.Sprintf("/Router/Router-%s/", string(value.name))); err != nil {
+				logger.Exception(err)
 			}
 		}
 	})
@@ -813,6 +825,8 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 }
 
 func (r *Table) RefreshEndpoint(id string, key string) error {
+	var newStatus Status
+
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
 		logger.Exception(err)
@@ -851,7 +865,12 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 		case constant.FailedTimesKeyString:
 			// do nothing
 		case constant.StatusKeyString:
-			// do nothing
+			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
+			if err != nil {
+				logger.Exception(err)
+				return err
+			}
+			newStatus = Status(tmp)
 		case constant.HealthCheckKeyString:
 			if hc, err := RefreshHealthCheck(r.cli, id, constant.HealthCheckPrefixDefinition+id+constant.Slash); err != nil {
 				logger.Exception(err)
@@ -864,14 +883,19 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 			return errors.NewFormat(200, fmt.Sprintf("unsupported service attribute: %s", keyStr))
 		}
 	}
-	if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil {
-		ep.setStatus(Offline)
-	} else if !ok && err == nil {
-		ep.setStatus(BreakDown)
+	if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil || !ok {
+		if newStatus == BreakDown {
+			ep.setStatus(BreakDown)
+		} else {
+			ep.setStatus(Offline)
+		}
 	} else {
 		ep.setStatus(Online)
 	}
 	r.endpointTable.Store(ep.nameString, ep)
+	if err := r.SetEndpointStatus(ep, ep.status); err != nil {
+		logger.Exception(err)
+	}
 
 	r.serviceTable.Range(func(key ServiceNameString, value *Service) bool {
 		if ori, ok := value.ep.Load(ep.nameString); ok {

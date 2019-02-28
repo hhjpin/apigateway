@@ -38,6 +38,7 @@ func (hc *HealthCheckWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 	hcId := tmp[0]
 	hcKey := hc.prefix + fmt.Sprintf(constant.HealthCheckPrefixString, hcId)
+	logger.Infof("新的HealthCheck写入事件")
 	logger.Debugf("healthCheck id: %s", hcId)
 	logger.Debugf("healthCheck key: %s", hcKey)
 
@@ -70,6 +71,7 @@ func (hc *HealthCheckWatcher) Delete(kv *mvccpb.KeyValue) error {
 	}
 	hcId := tmp[0]
 	hcKey := hc.prefix + fmt.Sprintf(constant.HealthCheckPrefixString, hcId)
+	logger.Infof("新的HealthCheck删除事件")
 	logger.Debugf("healthCheck id: %s", hcId)
 	logger.Debugf("healthCheck key: %s", hcKey)
 

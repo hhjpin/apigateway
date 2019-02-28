@@ -255,7 +255,7 @@ func (r *Table) SetRouterOnline(router *Router) (ok bool, err error) {
 			// data mapping error
 			return false, errors.New(135)
 		}
-		return false, errors.New(136)
+		return true, nil
 	}
 }
 
@@ -315,6 +315,9 @@ func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 	if !exists {
 		logger.Warning("endpoint not exists")
 		return errors.New(139)
+	}
+	if ep.status == status {
+		return nil
 	}
 	switch status {
 	case Online:

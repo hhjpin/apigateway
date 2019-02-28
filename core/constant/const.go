@@ -10,7 +10,7 @@ const (
 	NodePrefixString            = "Node-%s/"
 	NodePrefixDefinition        = "/Node/Node-"
 	HealthCheckPrefixDefinition = "/HealthCheck/HC-"
-	HealthCheckPrefixString = "HC-%s/"
+	HealthCheckPrefixString     = "HC-%s/"
 
 	IdKeyString          = "ID"
 	NameKeyString        = "Name"
