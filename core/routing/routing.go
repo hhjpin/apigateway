@@ -298,7 +298,7 @@ func (r *Table) SetEndpointOnline(ep *Endpoint) error {
 	if resp.Count == 0 {
 		//
 	} else {
-		if _, err := utils.PutKV(r.cli, ep.key(constant.FailedTimesKeyString), ""); err != nil {
+		if _, err := utils.PutKV(r.cli, ep.key(constant.FailedTimesKeyString), "0"); err != nil {
 			logger.Exception(err)
 		}
 	}
@@ -316,9 +316,6 @@ func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 		logger.Warning("endpoint not exists")
 		return errors.New(139)
 	}
-	if ep.status == status {
-		return nil
-	}
 	switch status {
 	case Online:
 		return r.SetEndpointOnline(ep)
@@ -330,10 +327,12 @@ func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 			return err
 		}
 		if resp.Count == 0 {
+			logger.Debugf("no failed times key")
 			if _, err := utils.PutKV(r.cli, ep.key(constant.FailedTimesKeyString), "1"); err != nil {
 				logger.Exception(err)
 			}
 		} else {
+			logger.Debugf("failed times resp: %+v", string(resp.Kvs[0].Value))
 			failedTimes, err = strconv.ParseInt(string(resp.Kvs[0].Value), 10, 64)
 			if err != nil {
 				logger.Exception(err)

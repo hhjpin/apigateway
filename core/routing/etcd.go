@@ -697,6 +697,66 @@ func (r *Table) DeleteService(name string) error {
 	return nil
 }
 
+func (r *Table) GetEndpoint(id string, key string) (*Endpoint, error) {
+	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
+	if err != nil {
+		logger.Exception(err)
+		return nil, err
+	}
+	ep := &Endpoint{}
+	for _, kv := range resp.Kvs {
+		key := bytes.TrimPrefix(kv.Key, []byte(key))
+		if bytes.Contains(key, constant.SlashBytes) {
+			logger.Warningf("invalid endpoint attribute key")
+			return nil, errors.NewFormat(200, "invalid endpoint attribute key")
+		}
+		keyStr := string(key)
+		switch keyStr {
+		case constant.IdKeyString:
+			// is forbidden to modify node id
+			if id != string(kv.Value) {
+				logger.Warningf("node key is not in accord with node id, node: %s", key)
+				ep.id = id
+			} else {
+				ep.id = string(kv.Value)
+			}
+		case constant.NameKeyString:
+			ep.name = kv.Value
+			ep.nameString = EndpointNameString(kv.Value)
+		case constant.HostKeyString:
+			ep.host = kv.Value
+		case constant.PortKeyString:
+			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
+			if err != nil {
+				logger.Exception(err)
+				logger.Error("wrong type of endpoint port")
+				return nil, err
+			}
+			ep.port = int(tmp)
+		case constant.FailedTimesKeyString:
+			// do nothing
+		case constant.StatusKeyString:
+			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
+			if err != nil {
+				logger.Exception(err)
+				return nil, err
+			}
+			ep.status = Status(tmp)
+		case constant.HealthCheckKeyString:
+			if hc, err := GetHealthCheck(r.cli, id, constant.HealthCheckPrefixDefinition+id+constant.Slash); err != nil {
+				logger.Exception(err)
+				return nil, err
+			} else {
+				ep.healthCheck = hc
+			}
+		default:
+			logger.Errorf("unsupported service attribute: %s", keyStr)
+			return nil, errors.NewFormat(200, fmt.Sprintf("unsupported service attribute: %s", keyStr))
+		}
+	}
+	return ep, nil
+}
+
 func (r *Table) CreateEndpoint(id string, key string) error {
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
@@ -832,6 +892,11 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 		logger.Exception(err)
 		return err
 	}
+	oriEp, err := r.GetEndpoint(id, key)
+	if err != nil {
+		logger.Exception(err)
+		return err
+	}
 	ep := &Endpoint{}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, []byte(key))
@@ -892,9 +957,13 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 	} else {
 		ep.setStatus(Online)
 	}
+	logger.Debugf("original ep status: %d", oriEp.status)
+	logger.Debugf("ep status: %d", ep.status)
 	r.endpointTable.Store(ep.nameString, ep)
-	if err := r.SetEndpointStatus(ep, ep.status); err != nil {
-		logger.Exception(err)
+	if oriEp.status != ep.status {
+		if err := r.SetEndpointStatus(ep, ep.status); err != nil {
+			logger.Exception(err)
+		}
 	}
 
 	r.serviceTable.Range(func(key ServiceNameString, value *Service) bool {
@@ -964,6 +1033,69 @@ func (r *Table) RefreshHealthCheck(id string, key string) error {
 }
 
 func CreateHealthCheck(cli *clientv3.Client, id string, key string) (*HealthCheck, error) {
+	resp, err := utils.GetPrefixKV(cli, key, clientv3.WithPrefix())
+	if err != nil {
+		logger.Exception(err)
+		return nil, err
+	}
+	hc := &HealthCheck{}
+	for _, kv := range resp.Kvs {
+		key := bytes.TrimPrefix(kv.Key, []byte(key))
+		if bytes.Contains(key, constant.SlashBytes) {
+			logger.Warningf("invalid health-check attribute key")
+			return nil, errors.NewFormat(200, "invalid health-check attribute key")
+		}
+		keyStr := string(key)
+		switch keyStr {
+		case constant.IdKeyString:
+			// is forbidden to modify health-check id
+			if id != string(kv.Value) {
+				logger.Warningf("node key is not in accord with node id, node: %s", key)
+				hc.id = id
+			} else {
+				hc.id = string(kv.Value)
+			}
+		case constant.PathKeyString:
+			hc.path = kv.Value
+		case constant.IntervalKeyString:
+			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
+			if err != nil {
+				logger.Exception(err)
+				return nil, err
+			}
+			hc.interval = uint8(tmp)
+		case constant.RetryKeyString:
+			if string(kv.Value) == "0" {
+				hc.retry = false
+			} else if string(kv.Value) == "1" {
+				hc.retry = true
+			} else {
+				logger.Warningf("unrecognized retry value: %+v", string(kv.Value))
+				hc.retry = false
+			}
+		case constant.RetryTimeKeyString:
+			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
+			if err != nil {
+				logger.Exception(err)
+				return nil, err
+			}
+			hc.retryTime = uint8(tmp)
+		case constant.TimeoutKeyString:
+			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
+			if err != nil {
+				logger.Exception(err)
+				return nil, err
+			}
+			hc.timeout = uint8(tmp)
+		default:
+			logger.Errorf("unsupported health-check attribute: %s", keyStr)
+			return nil, errors.NewFormat(200, fmt.Sprintf("unsupported health-check attribute: %s", keyStr))
+		}
+	}
+	return hc, nil
+}
+
+func GetHealthCheck(cli *clientv3.Client, id string, key string) (*HealthCheck, error) {
 	resp, err := utils.GetPrefixKV(cli, key, clientv3.WithPrefix())
 	if err != nil {
 		logger.Exception(err)

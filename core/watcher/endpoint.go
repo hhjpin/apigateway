@@ -1,8 +1,10 @@
 package watcher
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
@@ -37,10 +39,14 @@ func (ep *EndpointWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 	endpointId := tmp[0]
 	endpointKey := ep.prefix + fmt.Sprintf("Node-%s/", endpointId)
+	if bytes.Equal(kv.Key, []byte(endpointKey + constant.FailedTimesKeyString)) {
+		// ignore failed times key put event
+		return nil
+	}
 	logger.Infof("新的Endpoint写入事件")
 	logger.Debugf("endpoint id: %s", endpointId)
 	logger.Debugf("endpoint key: %s", endpointKey)
-
+	logger.Debugf("key: %s, value: %s", string(kv.Key), string(kv.Value))
 	if isCreate {
 		if ok, err := validKV(ep.cli, endpointKey, ep.attrs, false); err != nil || !ok {
 			logger.Warningf("new endpoint lack attribute, it may not have been created yet. Suggest to wait")
