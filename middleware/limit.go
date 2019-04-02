@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	config "git.henghajiang.com/backend/api_gateway_v2/conf"
+	"git.henghajiang.com/backend/api_gateway_v2/core/utils"
 	"git.henghajiang.com/backend/golang_utils"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/go-ego/murmur"
@@ -125,6 +126,12 @@ func (l Limiters) SetBlackList(ip string, limit uint64, expiresAt int64) {
 }
 
 func (l Limiters) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
+	defer func() {
+		if err := recover(); err != nil {
+			stack := utils.Stack(3)
+			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", utils.TimeFormat(time.Now()), err, stack)
+		}
+	}()
 	remoteIP := ctx.RemoteIP().String()
 	shardInt := murmur.Sum32(remoteIP)
 	shard := int(shardInt) % shardNumber
@@ -158,8 +165,11 @@ func (l *limiter) run(ctx context.Context, recv CountChan) {
 	defer func() {
 		if err := recover(); err != nil {
 			stack := stack(3)
-			go golang_utils.ErrMail("dropshipping_mp_user err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
+			go golang_utils.ErrMail("api gateway err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
 			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack)
+		}
+		if ctx.Err() == nil {
+			go l.consuming(ctx)
 		}
 	}()
 	for rec := range recv {
@@ -185,8 +195,11 @@ func (l *limiter) consuming(ctx context.Context) {
 	defer func() {
 		if err := recover(); err != nil {
 			stack := stack(3)
-			go golang_utils.ErrMail("dropshipping_mp_user err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
+			go golang_utils.ErrMail("api gateway err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
 			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack)
+		}
+		if ctx.Err() == nil {
+			go l.consuming(ctx)
 		}
 	}()
 	for {

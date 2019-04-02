@@ -51,16 +51,7 @@ func init() {
 	for shard := 0; shard < CountingShardNumber; shard++ {
 		CountingCh = append(CountingCh, make(chan *counting, 500))
 	}
-
-	//for _, c := range CountingCh {
-	//	go persistence(c)
-	//}
-
 }
-
-//func (c *counting) String() string {
-//
-//}
 
 func NewCounting(reqTime, respTime int64,
 	oriPath, method, svr, host, path, reqContentType, respContentType []byte,
@@ -104,8 +95,4 @@ func NewCounting(reqTime, respTime int64,
 		}
 	}
 	return &c
-}
-
-func persistence(c []*counting) {
-
 }

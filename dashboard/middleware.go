@@ -121,7 +121,7 @@ func RecoveryWithWriter() gin.HandlerFunc {
 				if logger != nil {
 					stack := stack(3)
 					httpRequest, _ := httputil.DumpRequest(c.Request, false)
-					go golang_utils.ErrMail("dropshipping_mp_user err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s\n%s", timeFormat(time.Now()), string(httpRequest), err, stack))
+					go golang_utils.ErrMail("api gateway err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s\n%s", timeFormat(time.Now()), string(httpRequest), err, stack))
 					logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s\n%s", timeFormat(time.Now()), string(httpRequest), err, stack)
 				}
 				c.String(200, `{"err_code": 5,"err_msg":"当前访问量过大, 请稍后再试","err_msg_en":"service busy, please try again","data": {}}`)

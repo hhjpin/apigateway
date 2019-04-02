@@ -76,6 +76,7 @@ func ConnectToEtcd() *clientv3.Client {
 }
 
 func init() {
+
 	etcdCli := ConnectToEtcd()
 	table = routing.InitRoutingTable(etcdCli)
 

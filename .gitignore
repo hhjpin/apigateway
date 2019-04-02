@@ -19,3 +19,5 @@ src/gopkg.in
 pkg/
 bin/
 .DS_Store
+api_gateway_v2
+go_tester
