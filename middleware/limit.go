@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	config "git.henghajiang.com/backend/api_gateway_v2/conf"
-	"git.henghajiang.com/backend/api_gateway_v2/core/utils"
+	"git.henghajiang.com/backend/api_gateway_v2/middleware/utils"
 	"git.henghajiang.com/backend/golang_utils"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/go-ego/murmur"

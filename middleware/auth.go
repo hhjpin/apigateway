@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"git.henghajiang.com/backend/api_gateway_v2/core/utils"
+	"git.henghajiang.com/backend/api_gateway_v2/middleware/utils"
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gomodule/redigo/redis"
