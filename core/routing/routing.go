@@ -504,7 +504,6 @@ func (r *Table) Select(input []byte) (TargetServer, error) {
 	ringLength := matchRouter.service.onlineEp.Len()
 	counts := 0
 	for {
-		logger.Debugf("online ep ring current: %s, next: %s, prev: %s", matchRouter.service.onlineEp.Value, matchRouter.service.onlineEp.Next().Value, matchRouter.service.onlineEp.Prev().Value)
 		next := matchRouter.service.onlineEp.Value
 		matchRouter.service.onlineEp = matchRouter.service.onlineEp.Move(1)
 		_, ok := next.(EndpointNameString)

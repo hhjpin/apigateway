@@ -10,6 +10,7 @@ import (
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/reuseport"
 	"os"
 	"runtime"
 	"sync"
@@ -23,7 +24,6 @@ type etcdPool struct {
 
 var (
 	table    *routing.Table
-	watchers map[watcher.Watcher]clientv3.WatchChan
 	EtcdPool = etcdPool{}
 
 	logger = log.New()
@@ -89,13 +89,13 @@ func init() {
 	healthCheckWatcher := watcher.NewHealthCheckWatcher(etcdCli, context.Background())
 	healthCheckWatcher.BindTable(table)
 
-	watchers = make(map[watcher.Watcher]clientv3.WatchChan)
-	watchers[routeWatcher] = routeWatcher.WatchChan
-	watchers[serviceWatcher] = serviceWatcher.WatchChan
-	watchers[endpointWatcher] = endpointWatcher.WatchChan
-	watchers[healthCheckWatcher] = healthCheckWatcher.WatchChan
+	watcher.Mapping = make(map[watcher.Watcher]clientv3.WatchChan)
+	watcher.Mapping[routeWatcher] = routeWatcher.WatchChan
+	watcher.Mapping[serviceWatcher] = serviceWatcher.WatchChan
+	watcher.Mapping[endpointWatcher] = endpointWatcher.WatchChan
+	watcher.Mapping[healthCheckWatcher] = healthCheckWatcher.WatchChan
 	go table.HealthCheck()
-	go watcher.Watch(watchers)
+	go watcher.Watch(watcher.Mapping)
 }
 
 func main() {
@@ -118,7 +118,8 @@ func main() {
 
 	host := fmt.Sprintf("%s:%d", serverConf.ListenHost, serverConf.ListenPort)
 	logger.Infof("gateway server start at: %s", host)
-	err := server.ListenAndServe(host)
+	listener, err := reuseport.Listen("tcp4", host)
+	err = server.Serve(listener)
 	if err != nil {
 		logger.Exception(err)
 		os.Exit(-1)

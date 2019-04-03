@@ -63,7 +63,6 @@ func (r *Table) HealthCheck() {
 		go r.HealthCheck()
 	}()
 	for {
-		logger.Debugf("endpoint table: %+v", r.endpointTable.internal)
 		r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) bool {
 			var status Status
 			if value.status == Offline {
@@ -89,7 +88,6 @@ func (r *Table) HealthCheck() {
 					}
 				}
 			}
-			logger.Debugf("status: %d", status)
 			if check, err := value.healthCheck.Check(value.host, value.port); err == nil {
 				if check {
 					if status != Online {

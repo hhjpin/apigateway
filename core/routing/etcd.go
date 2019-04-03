@@ -42,7 +42,6 @@ func InitRoutingTable(cli *clientv3.Client) *Table {
 	})
 	if len(epSlice) > 0 {
 		for _, ep := range epSlice {
-			logger.Debugf("ep {name: %s} {host: %s} {port: %d} {status: %d}", ep.nameString, string(ep.host), ep.port, ep.status)
 			if check, err := ep.healthCheck.Check(ep.host, ep.port); check {
 				if err = rt.SetEndpointOnline(ep); err != nil {
 					ep.setStatus(Online)
@@ -51,7 +50,6 @@ func InitRoutingTable(cli *clientv3.Client) *Table {
 				if err = rt.SetEndpointStatus(ep, BreakDown); err != nil {
 					ep.setStatus(BreakDown)
 				}
-				//logger.Errorf("Endpoint {%s:%d} health check failed: %s", string(ep.host), ep.port, err.Error())
 			}
 		}
 	}
@@ -957,8 +955,6 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 	} else {
 		ep.setStatus(Online)
 	}
-	logger.Debugf("original ep status: %d", oriEp.status)
-	logger.Debugf("ep status: %d", ep.status)
 	r.endpointTable.Store(ep.nameString, ep)
 	if oriEp.status != ep.status {
 		if err := r.SetEndpointStatus(ep, ep.status); err != nil {

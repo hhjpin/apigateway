@@ -16,6 +16,7 @@ type ServiceWatcher struct {
 	attrs     []string
 	table     *routing.Table
 	WatchChan clientv3.WatchChan
+	ctx context.Context
 	cli       *clientv3.Client
 }
 
@@ -24,9 +25,23 @@ func NewServiceWatcher(cli *clientv3.Client, ctx context.Context) *ServiceWatche
 		cli:    cli,
 		prefix: serviceWatcherPrefix,
 		attrs:  []string{"Name", "Node"},
+		ctx: ctx,
 	}
 	s.WatchChan = cli.Watch(ctx, s.prefix, clientv3.WithPrefix())
 	return s
+}
+
+func (s *ServiceWatcher) Ctx() context.Context {
+	return s.ctx
+}
+
+func (s *ServiceWatcher) GetWatchChan() clientv3.WatchChan{
+	return s.WatchChan
+}
+
+func (s *ServiceWatcher) Refresh() {
+	s.ctx = context.Background()
+	s.WatchChan = s.cli.Watch(s.ctx, s.prefix, clientv3.WithPrefix())
 }
 
 func (s *ServiceWatcher) BindTable(table *routing.Table) {

@@ -17,6 +17,7 @@ type EndpointWatcher struct {
 	attrs     []string
 	table     *routing.Table
 	WatchChan clientv3.WatchChan
+	ctx context.Context
 	cli       *clientv3.Client
 }
 
@@ -25,9 +26,23 @@ func NewEndpointWatcher(cli *clientv3.Client, ctx context.Context) *EndpointWatc
 		cli:    cli,
 		prefix: endpointWatcherPrefix,
 		attrs:  []string{"ID", "Name", "Port", "Host"},
+		ctx: ctx,
 	}
 	ep.WatchChan = cli.Watch(ctx, ep.prefix, clientv3.WithPrefix())
 	return ep
+}
+
+func (ep *EndpointWatcher) Ctx() context.Context {
+	return ep.ctx
+}
+
+func (ep *EndpointWatcher) GetWatchChan() clientv3.WatchChan{
+	return ep.WatchChan
+}
+
+func (ep *EndpointWatcher) Refresh() {
+	ep.ctx = context.Background()
+	ep.WatchChan = ep.cli.Watch(ep.ctx, ep.prefix, clientv3.WithPrefix())
 }
 
 func (ep *EndpointWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {

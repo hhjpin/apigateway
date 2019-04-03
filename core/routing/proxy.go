@@ -2,14 +2,15 @@ package routing
 
 import (
 	"bytes"
-	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
 	"git.henghajiang.com/backend/golang_utils/errors"
-	"github.com/go-ego/murmur"
 	"github.com/valyala/fasthttp"
-	"strconv"
 	"time"
+)
+
+const (
+	middlewareTimeoutLimit = 1
 )
 
 func MainRequestHandlerWrapper(table *Table, middle ...middleware.Middleware) fasthttp.RequestHandler {
@@ -22,7 +23,7 @@ func MainRequestHandlerWrapper(table *Table, middle ...middleware.Middleware) fa
 				for _, m := range middle {
 					go m.Work(ctx, errChan)
 				}
-				timer := time.NewTimer(1 * time.Second)
+				timer := time.NewTimer(middlewareTimeoutLimit * time.Second)
 				for i := 0; i < len(middle); i++ {
 					timer.Reset(1 * time.Second)
 					select {
@@ -56,7 +57,7 @@ func MainRequestHandlerWrapper(table *Table, middle ...middleware.Middleware) fa
 			go middleware.Logger(ctx.Response.StatusCode(), string(ctx.Request.URI().Path()), string(ctx.Request.Header.Method()), ctx.RemoteIP().String(), start)
 			return
 		},
-		time.Second*5,
+		time.Second*60,
 		string(errors.New(5).MarshalEmptyData()),
 	)
 }
@@ -75,38 +76,38 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	defer fasthttp.ReleaseURI(revReqUri)
 
 	defer func() {
-		var resContentType []byte
-
-		if revRes != nil {
-			resContentType = revRes.Header.ContentType()
-		}
-
-		counting := middleware.NewCounting(
-			ctx.ConnTime().UnixNano(),
-			time.Now().UnixNano(),
-			ctx.Path(),
-			ctx.Method(),
-			target.svr,
-			target.host,
-			target.uri,
-			ctx.Request.Header.ContentType(),
-			resContentType,
-			revReqHeader,
-			revReqUrlParam,
-			ctx.Response.StatusCode(),
-			ctx.Request.Body(),
-			ctx.Response.Body(),
-		)
-		go func() {
-			hashed := murmur.Sum32(strconv.FormatUint(ctx.ConnID(), 10)) % middleware.CountingShardNumber
-			timer := time.NewTimer(5 * time.Second)
-			select {
-			case <-timer.C:
-				logger.Warning("Counting channel maybe full")
-			case middleware.CountingCh[hashed] <- counting:
-				// pass
-			}
-		}()
+		//var resContentType []byte
+		//
+		//if revRes != nil {
+		//	resContentType = revRes.Header.ContentType()
+		//}
+		//
+		//counting := middleware.NewCounting(
+		//	ctx.ConnTime().UnixNano(),
+		//	time.Now().UnixNano(),
+		//	ctx.Path(),
+		//	ctx.Method(),
+		//	target.svr,
+		//	target.host,
+		//	target.uri,
+		//	ctx.Request.Header.ContentType(),
+		//	resContentType,
+		//	revReqHeader,
+		//	revReqUrlParam,
+		//	ctx.Response.StatusCode(),
+		//	ctx.Request.Body(),
+		//	ctx.Response.Body(),
+		//)
+		//go func() {
+		//	hashed := murmur.Sum32(strconv.FormatUint(ctx.ConnID(), 10)) % middleware.CountingShardNumber
+		//	timer := time.NewTimer(5 * time.Second)
+		//	select {
+		//	case <-timer.C:
+		//		logger.Warning("Counting channel maybe full")
+		//	case middleware.CountingCh[hashed] <- counting:
+		//		// pass
+		//	}
+		//}()
 	}()
 
 	path := ctx.Path()
@@ -165,7 +166,6 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		revReq.SetBody(body)
 	}
 	revReq.Header.SetMethodBytes(ctx.Request.Header.Method())
-	fmt.Println(string(revReq.Header.Method()))
 	err = fasthttp.Do(revReq, revRes)
 	if err != nil {
 		logger.Exception(err)
@@ -179,6 +179,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 			ctx.Response.Header.SetBytesKV(key, value)
 		}
 	})
+	ctx.Response.SetConnectionClose()
 	ctx.Response.SetStatusCode(revRes.StatusCode())
 	ctx.Response.Header.SetContentTypeBytes(revRes.Header.ContentType())
 	ctx.SetBody(revRes.Body())

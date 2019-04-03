@@ -62,10 +62,10 @@ Middleware:
     PersistencePeriod: 60
     LogDir: /var/log/gw/counter/
   Limiter:
-    DefaultLimit: 200
-    DefaultConsumeNumberPerPeriod: 20
+    DefaultLimit: 5000
+    DefaultConsumeNumberPerPeriod: 500
     DefaultConsumePeriod: 5
-    MaxLimitChanLength: 1000
+    MaxLimitChanLength: 10000
 
     BlackList:
   Auth:

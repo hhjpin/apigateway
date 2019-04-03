@@ -16,6 +16,7 @@ type HealthCheckWatcher struct {
 	attrs     []string
 	table     *routing.Table
 	WatchChan clientv3.WatchChan
+	ctx context.Context
 	cli       *clientv3.Client
 }
 
@@ -24,9 +25,24 @@ func NewHealthCheckWatcher(cli *clientv3.Client, ctx context.Context) *HealthChe
 		cli:    cli,
 		prefix: healthCheckWatcherPrefix,
 		attrs:  []string{"ID", "Interval", "Path", "Retry", "RetryTime", "RetryTime"},
+		ctx: ctx,
 	}
 	hc.WatchChan = cli.Watch(ctx, hc.prefix, clientv3.WithPrefix())
 	return hc
+}
+
+
+func (hc *HealthCheckWatcher) Ctx() context.Context {
+	return hc.ctx
+}
+
+func (hc *HealthCheckWatcher) GetWatchChan() clientv3.WatchChan{
+	return hc.WatchChan
+}
+
+func (hc *HealthCheckWatcher) Refresh() {
+	hc.ctx = context.Background()
+	hc.WatchChan = hc.cli.Watch(hc.ctx, hc.prefix, clientv3.WithPrefix())
 }
 
 func (hc *HealthCheckWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {

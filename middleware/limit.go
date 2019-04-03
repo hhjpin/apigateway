@@ -38,7 +38,7 @@ type limiter struct {
 
 const (
 	maxUint64      uint64 = 18446744073709551614
-	maxBannedCount uint64 = 10
+	maxBannedCount uint64 = 50000
 )
 
 var (
@@ -135,7 +135,6 @@ func (l Limiters) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 	remoteIP := ctx.RemoteIP().String()
 	shardInt := murmur.Sum32(remoteIP)
 	shard := int(shardInt) % shardNumber
-	logger.Debugf("request murmur: %d, shard: %d", shardInt, shard)
 	l.ReceiveChan[shard] <- remoteIP
 
 	limiter := l.limiterArray[shard]
@@ -147,7 +146,6 @@ func (l Limiters) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 			errChan <- errors.NewFormat(11, fmt.Sprintf("您的访问过于频繁, 将于%s解除限制", time.Unix(black.expiresAt, 0).Format("2006-1-2 15:04:05")))
 		}
 	} else {
-		logger.Debugf("remote ip request burst: %d, limit: %d", burst, limiter.limit)
 		if burst >= limiter.limit && burst < maxBannedCount {
 			errChan <- errors.New(10)
 		} else if burst >= maxBannedCount {
@@ -211,7 +209,6 @@ func (l *limiter) consuming(ctx context.Context) {
 		}
 		l.Lock()
 		for k, v := range l.internal {
-			logger.Debugf("limiter: %+v", *l)
 			if v < l.consume {
 				delete(l.internal, k)
 			} else {

@@ -15,6 +15,7 @@ type RouteWatcher struct {
 	attrs     []string
 	table     *routing.Table
 	WatchChan clientv3.WatchChan
+	ctx context.Context
 	cli       *clientv3.Client
 }
 
@@ -23,9 +24,23 @@ func NewRouteWatcher(cli *clientv3.Client, ctx context.Context) *RouteWatcher {
 		cli:    cli,
 		prefix: routeWatcherPrefix,
 		attrs:  []string{"BackendApi", "FrontendApi", "ID", "Name", "Service", "Status"},
+		ctx: ctx,
 	}
 	w.WatchChan = cli.Watch(ctx, w.prefix, clientv3.WithPrefix())
 	return w
+}
+
+func (r *RouteWatcher) Ctx() context.Context {
+	return r.ctx
+}
+
+func (r *RouteWatcher) GetWatchChan() clientv3.WatchChan{
+	return r.WatchChan
+}
+
+func (r *RouteWatcher) Refresh() {
+	r.ctx = context.Background()
+	r.WatchChan = r.cli.Watch(r.ctx, r.prefix, clientv3.WithPrefix())
 }
 
 func (r *RouteWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
