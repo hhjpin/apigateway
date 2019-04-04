@@ -21,7 +21,6 @@ type Watcher interface {
 
 var Mapping map[Watcher]clientv3.WatchChan
 
-
 func watch(w Watcher, c clientv3.WatchChan) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -34,13 +33,13 @@ func watch(w Watcher, c clientv3.WatchChan) {
 
 	for {
 		select {
-		case <- w.Ctx().Done():
+		case <-w.Ctx().Done():
 			logger.Exception(w.Ctx().Err())
 			w.Refresh()
 			c = w.GetWatchChan()
 			Mapping[w] = c
 			goto Over
-		case resp := <- c:
+		case resp := <-c:
 			if resp.Canceled {
 				logger.Warningf("watch canceled")
 				logger.Exception(w.Ctx().Err())
@@ -68,8 +67,8 @@ func watch(w Watcher, c clientv3.WatchChan) {
 		}
 	}
 
-	Over:
-		logger.Debugf("watch task finished")
+Over:
+	logger.Debugf("watch task finished")
 }
 
 func Watch(wch map[Watcher]clientv3.WatchChan) {

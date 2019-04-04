@@ -17,7 +17,7 @@ type EndpointWatcher struct {
 	attrs     []string
 	table     *routing.Table
 	WatchChan clientv3.WatchChan
-	ctx context.Context
+	ctx       context.Context
 	cli       *clientv3.Client
 }
 
@@ -26,7 +26,7 @@ func NewEndpointWatcher(cli *clientv3.Client, ctx context.Context) *EndpointWatc
 		cli:    cli,
 		prefix: endpointWatcherPrefix,
 		attrs:  []string{"ID", "Name", "Port", "Host"},
-		ctx: ctx,
+		ctx:    ctx,
 	}
 	ep.WatchChan = cli.Watch(ctx, ep.prefix, clientv3.WithPrefix())
 	return ep
@@ -36,7 +36,7 @@ func (ep *EndpointWatcher) Ctx() context.Context {
 	return ep.ctx
 }
 
-func (ep *EndpointWatcher) GetWatchChan() clientv3.WatchChan{
+func (ep *EndpointWatcher) GetWatchChan() clientv3.WatchChan {
 	return ep.WatchChan
 }
 
@@ -54,7 +54,7 @@ func (ep *EndpointWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 	endpointId := tmp[0]
 	endpointKey := ep.prefix + fmt.Sprintf("Node-%s/", endpointId)
-	if bytes.Equal(kv.Key, []byte(endpointKey + constant.FailedTimesKeyString)) {
+	if bytes.Equal(kv.Key, []byte(endpointKey+constant.FailedTimesKeyString)) {
 		// ignore failed times key put event
 		return nil
 	}
