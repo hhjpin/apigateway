@@ -652,7 +652,6 @@ func (r *Table) RefreshService(name string, key string) error {
 	r.routerTable.Range(func(key RouterNameString, value *Router) {
 		if value.service.nameString == ori.nameString {
 			// service connected
-			logger.Debugf("current router service: %+v", value.service)
 			value.service = ori
 			if ok := value.CheckStatus(Online); ok {
 				if _, err := r.SetRouterOnline(value); err != nil {
@@ -807,12 +806,14 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 			return errors.NewFormat(200, fmt.Sprintf("unsupported service attribute: %s", keyStr))
 		}
 	}
-	if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil {
-		ep.setStatus(Offline)
-	} else if !ok && err == nil {
-		ep.setStatus(BreakDown)
-	} else {
-		ep.setStatus(Online)
+	if ep.healthCheck != nil {
+		if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil {
+			ep.setStatus(Offline)
+		} else if !ok && err == nil {
+			ep.setStatus(BreakDown)
+		} else {
+			ep.setStatus(Online)
+		}
 	}
 	r.endpointTable.Store(ep.nameString, ep)
 
@@ -832,7 +833,6 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 		return false
 	})
 	if !flag {
-		// endpoint not exists in memory, it should be process here
 		resp, err := utils.GetPrefixKV(r.cli, constant.ServiceDefinition, clientv3.WithPrefix())
 		if err != nil {
 			logger.Exception(err)
@@ -859,10 +859,8 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 					if n == ep.id {
 						// unprocessed endpoint found
 						if s, err := r.GetServiceByName(svrName); err != nil {
-							// service not found, try to rebuild it
-							if err := r.CreateService(string(svrName), fmt.Sprintf("/Service/Service-%s/", svrName)); err != nil {
-								logger.Exception(err)
-							}
+							// service not found, do nothing
+							// waiting create_service func to connect this endpoint
 						} else {
 							if err := r.RefreshService(string(s.nameString), fmt.Sprintf("/Service/Service-%s/", s.nameString)); err != nil {
 								logger.Exception(err)
@@ -884,16 +882,19 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 
 func (r *Table) RefreshEndpoint(id string, key string) error {
 	var newStatus Status
-
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
 		logger.Exception(err)
 		return err
 	}
-	oriEp, err := r.GetEndpoint(id, key)
+	tmp, err := r.GetEndpoint(id, key)
 	if err != nil {
 		logger.Exception(err)
 		return err
+	}
+	oriEp, ok := r.endpointTable.Load(tmp.nameString)
+	if !ok {
+		return r.CreateEndpoint(id, key)
 	}
 	ep := &Endpoint{}
 	for _, kv := range resp.Kvs {
@@ -946,20 +947,25 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 			return errors.NewFormat(200, fmt.Sprintf("unsupported service attribute: %s", keyStr))
 		}
 	}
-	if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil || !ok {
-		if newStatus == BreakDown {
-			ep.setStatus(BreakDown)
+	if ep.healthCheck != nil {
+		if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil || !ok {
+			if newStatus == BreakDown {
+				ep.setStatus(BreakDown)
+			} else {
+				ep.setStatus(Offline)
+			}
 		} else {
-			ep.setStatus(Offline)
+			ep.setStatus(Online)
 		}
-	} else {
-		ep.setStatus(Online)
-	}
-	r.endpointTable.Store(ep.nameString, ep)
-	if oriEp.status != ep.status {
-		if err := r.SetEndpointStatus(ep, ep.status); err != nil {
-			logger.Exception(err)
+		if oriEp.status != ep.status {
+			if err := r.SetEndpointStatus(oriEp, ep.status); err != nil {
+				logger.Exception(err)
+			}
 		}
+		oriEp.healthCheck = ep.healthCheck
+		oriEp.port = ep.port
+		oriEp.host = ep.host
+		oriEp.rate = ep.rate
 	}
 
 	r.serviceTable.Range(func(key ServiceNameString, value *Service) bool {

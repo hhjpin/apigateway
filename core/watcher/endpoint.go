@@ -58,10 +58,7 @@ func (ep *EndpointWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 		// ignore failed times key put event
 		return nil
 	}
-	logger.Infof("新的Endpoint写入事件")
-	logger.Debugf("endpoint id: %s", endpointId)
-	logger.Debugf("endpoint key: %s", endpointKey)
-	logger.Debugf("key: %s, value: %s", string(kv.Key), string(kv.Value))
+	logger.Debugf("新的Endpoint写入事件, key: %s, value: %s", string(kv.Key), string(kv.Value))
 	if isCreate {
 		if ok, err := validKV(ep.cli, endpointKey, ep.attrs, false); err != nil || !ok {
 			logger.Warningf("new endpoint lack attribute, it may not have been created yet. Suggest to wait")
@@ -91,9 +88,7 @@ func (ep *EndpointWatcher) Delete(kv *mvccpb.KeyValue) error {
 	}
 	endpointId := tmp[0]
 	endpointKey := ep.prefix + fmt.Sprintf("Node-%s/", endpointId)
-	logger.Infof("新的Endpoint删除事件")
-	logger.Debugf("endpoint id: %s", endpointId)
-	logger.Debugf("endpoint key: %s", endpointKey)
+	logger.Debugf("新的Endpoint删除事件, id: %s, key: %s", endpointId, endpointKey)
 
 	if ok, err := validKV(ep.cli, endpointKey, ep.attrs, true); err != nil || !ok {
 		logger.Warningf("endpoint attribute still exists, it may not have been deleted yet. Suggest to wait")

@@ -332,7 +332,6 @@ func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 				logger.Exception(err)
 			}
 		} else {
-			logger.Debugf("failed times resp: %+v", string(resp.Kvs[0].Value))
 			failedTimes, err = strconv.ParseInt(string(resp.Kvs[0].Value), 10, 64)
 			if err != nil {
 				logger.Exception(err)
@@ -342,7 +341,7 @@ func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 				logger.Exception(err)
 			}
 		}
-		logger.Debugf("failedTimes: %d, maxRetryTimes: %d", int(failedTimes), int(ep.healthCheck.retryTime))
+		logger.Debugf("健康检查重试 failedTimes: %d, maxRetryTimes: %d", int(failedTimes), int(ep.healthCheck.retryTime))
 		if int(failedTimes) >= int(ep.healthCheck.retryTime) {
 			// exceed max retry times, tag this ep to offline
 			if _, err := utils.PutKV(r.cli, ep.key(constant.StatusKeyString), Offline.String()); err != nil {

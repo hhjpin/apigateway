@@ -55,7 +55,7 @@ func (h *HealthCheck) Check(host []byte, port int) (bool, error) {
 
 func (r *Table) HealthCheck() {
 	defer func() {
-		logger.Debugf("health check quit")
+		logger.Debugf("健康检查异常退出")
 		if err := recover(); err != nil {
 			stack := utils.Stack(3)
 			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", utils.TimeFormat(time.Now()), err, stack)
@@ -66,7 +66,7 @@ func (r *Table) HealthCheck() {
 		r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) bool {
 			var status Status
 			if value.status == Offline {
-				logger.Warningf("endpoints [%s] offline, skip health-check", value.nameString)
+				logger.Warningf("节点 [%s] 离线, 跳过健康检查", value.nameString)
 				return false
 			}
 			resp, err := utils.GetKV(r.cli, value.key(constant.StatusKeyString))

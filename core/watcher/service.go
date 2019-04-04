@@ -61,10 +61,7 @@ func (s *ServiceWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 	svrName := tmp[0]
 	svrKey := s.prefix + fmt.Sprintf(constant.ServicePrefixString, svrName)
-	logger.Infof("新的Service写入事件")
-	logger.Debugf("service name: %s", svrName)
-	logger.Debugf("service key: %s", svrKey)
-
+	logger.Debugf("新的Service写入事件, name: %s, key: %s", svrName, svrKey)
 	if isCreate {
 		if ok, err := validKV(s.cli, svrKey, s.attrs, false); err != nil || !ok {
 			logger.Warningf("new service lack attribute, it may not have been created yet. Suggest to wait")
@@ -94,9 +91,7 @@ func (s *ServiceWatcher) Delete(kv *mvccpb.KeyValue) error {
 	}
 	svrName := tmp[0]
 	svrKey := s.prefix + fmt.Sprintf(constant.ServicePrefixString, svrName)
-	logger.Infof("新的Service删除事件")
-	logger.Debugf("service name: %s", svrName)
-	logger.Debugf("service key: %s", svrKey)
+	logger.Debugf("新的Service删除事件, name: %s, key: %s", svrName, svrKey)
 	if ok, err := validKV(s.cli, svrKey, s.attrs, true); err != nil || !ok {
 		logger.Warningf("service attribute still exists, it may not have been deleted yet. Suggest to wait")
 		return nil
