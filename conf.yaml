@@ -32,6 +32,7 @@ Server:
 
 # Etcd config
 Etcd:
+  name: "etcd-00"
 
   # Endpoint is a list of URLs
   Endpoints: []
@@ -52,3 +53,23 @@ Etcd:
   # DialKeepAliveTimeout is the time that the client waits for a response for the keep-alive probe.
   # If the response is not received in this time, the connection will be closed.
   DialKeepAliveTimeout: 5
+
+# Middleware config
+Middleware:
+
+  # counter middleware
+  Counter:
+    PersistencePeriod: 60
+    LogDir: /var/log/gw/counter/
+  Limiter:
+    DefaultLimit: 5000
+    DefaultConsumeNumberPerPeriod: 500
+    DefaultConsumePeriod: 5
+    MaxLimitChanLength: 10000
+
+    BlackList:
+  Auth:
+    Redis:
+      Host: 127.0.0.1:3379
+      DB: 0
+      Password: your password
