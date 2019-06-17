@@ -6,9 +6,7 @@ import (
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/valyala/fasthttp"
 	"io/ioutil"
-	"os"
 	"runtime"
-	"strconv"
 	"time"
 )
 
@@ -24,23 +22,6 @@ var (
 	dot       = []byte(".")
 	slash     = []byte("/")
 )
-
-func init() {
-	serverDebug := os.Getenv("SERVER_DEBUG")
-	if serverDebug != "" {
-		tmp, err := strconv.ParseInt(serverDebug, 10, 64)
-		if err != nil {
-			logger.Exception(err)
-		}
-		if tmp > 0 {
-			logger.EnableDebug()
-		} else {
-			logger.DisableDebug()
-		}
-	} else {
-		logger.EnableDebug()
-	}
-}
 
 func function(pc uintptr) []byte {
 	fn := runtime.FuncForPC(pc)
