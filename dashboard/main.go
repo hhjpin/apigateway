@@ -14,7 +14,7 @@ import (
 
 var (
 	etcdClient *clientv3.Client
-	logger     = log.New()
+	logger     = log.Logger
 	flagPort   = flag.Int("port", 80, "server listening port")
 )
 

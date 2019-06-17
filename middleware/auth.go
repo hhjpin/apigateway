@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"git.henghajiang.com/backend/api_gateway_v2/middleware/utils"
-	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gomodule/redigo/redis"
 	"github.com/valyala/fasthttp"
@@ -28,9 +27,6 @@ const (
 	token2user     = "token:user"
 )
 
-var (
-	authLogger = log.New()
-)
 var redisConn redis.Conn
 
 func GetUserByToken(token string) (userId int, err error) {
@@ -69,7 +65,7 @@ func (a *Auth) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 			return []byte(tokenSignature), nil
 		})
 		if err != nil {
-			authLogger.Exception(err)
+			logger.Exception(err)
 		} else {
 
 			userId, _ := GetUserByToken(token)

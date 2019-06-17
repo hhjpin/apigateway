@@ -26,7 +26,7 @@ var (
 	table    *routing.Table
 	EtcdPool = etcdPool{}
 
-	logger = log.New()
+	logger = log.Logger
 )
 
 func (p *etcdPool) Load(key string) (cli *clientv3.Client, exists bool) {

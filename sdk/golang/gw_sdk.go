@@ -55,7 +55,7 @@ type ApiGatewayRegistrant struct {
 }
 
 var (
-	logger = log.New()
+	logger = log.Logger
 )
 
 func NewHealthCheck(path string, timeout, interval, retryTime uint8, retry bool) *HealthCheck {

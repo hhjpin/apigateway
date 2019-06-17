@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	logger = log.New()
+	logger = log.Logger
 
 	dunno     = []byte("???")
 	centerDot = []byte("·")
