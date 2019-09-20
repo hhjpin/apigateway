@@ -35,7 +35,7 @@ const (
 )
 
 var (
-	VariableIdentifier = []byte("$")
+	VariableIdentifier = []byte(":")
 	UriSlash           = []byte("/")
 )
 
@@ -157,7 +157,7 @@ func (r *Table) endpointSliceExists(ep []*Endpoint) (rest []*Endpoint) {
 func (r *Table) GetRouterByName(name []byte) (*Router, error) {
 	router, exists := r.routerTable.Load(RouterNameString(name))
 	if !exists {
-		logger.Warning("can not find router by name: %s", RouterNameString(name))
+		logger.Warningf("can not find router by name: %s", RouterNameString(name))
 		return nil, errors.New(131)
 	}
 	return router, nil

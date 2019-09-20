@@ -63,7 +63,7 @@ func InitRoutingTable(cli *clientv3.Client) *Table {
 		if ok {
 			confirm, _ := value.service.checkEndpointStatus(Online)
 			if err := value.service.ResetOnlineEndpointRing(confirm); err != nil {
-				logger.Error(err.(errors.Error).String())
+				logger.Error(err.(errors.Error).String(), " ", key, " ", value.frontendApi.pathString)
 			}
 		}
 	})
@@ -809,7 +809,7 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 	if ep.healthCheck != nil {
 		if ok, err := ep.healthCheck.Check(ep.host, ep.port); err != nil {
 			ep.setStatus(Offline)
-		} else if !ok && err == nil {
+		} else if !ok {
 			ep.setStatus(BreakDown)
 		} else {
 			ep.setStatus(Online)
