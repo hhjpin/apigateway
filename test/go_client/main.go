@@ -75,9 +75,9 @@ func main() {
 		node,
 		svr,
 		[]*golang.Router{
-			golang.NewRouter("test1", "/front/$1", "/test/$1", svr),
-			golang.NewRouter("test2", "/api/v1/test/$1", "/test/$1", svr),
-			golang.NewRouter("test3", "/rd", "/redirect", svr),
+			golang.NewRouter("test1", "POST", "/front/$1", "/test/$1", svr),
+			golang.NewRouter("test2", "GET", "/api/v1/test/$1", "/test/$1", svr),
+			golang.NewRouter("test3", "POST", "/rd", "/redirect", svr),
 		},
 	)
 	go func(g *golang.ApiGatewayRegistrant) {

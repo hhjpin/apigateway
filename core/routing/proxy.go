@@ -110,7 +110,6 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		//}()
 	}()
 
-	path := ctx.Path()
 	routingTable := ctx.UserValue("Table")
 
 	if routingTable == nil {
@@ -126,7 +125,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	target, err := rt.Select(path)
+	target, err := rt.Select(ctx.Path(), ctx.Method())
 	if err != nil {
 		logger.Exception(err)
 		if e, ok := err.(errors.Error); ok {

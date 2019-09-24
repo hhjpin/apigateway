@@ -32,6 +32,7 @@ type Router struct {
 	ID       string
 	Name     string
 	Status   uint8
+	Method   string
 	Frontend string
 	Backend  string
 	Service  *Service
@@ -96,8 +97,10 @@ func NewService(name string, node *Node) *Service {
 	}
 }
 
-func NewRouter(name, frontend, backend string, service *Service) *Router {
-	src := fmt.Sprintf("%s-%s-%s-%s", name, frontend, backend, service.Name)
+func NewRouter(name, method, frontend, backend string, service *Service) *Router {
+	method = strings.ToUpper(method)
+	src := fmt.Sprintf("%s-%s-%s-%s-%s", name, method, frontend, backend, service.Name)
+	fmt.Println(">> GATE route: ", src)
 	if strings.Contains(name, "/") {
 		logger.Errorf("name can not contains '/'")
 		os.Exit(-1)
@@ -109,6 +112,7 @@ func NewRouter(name, frontend, backend string, service *Service) *Router {
 		ID:       md5str1,
 		Name:     name,
 		Status:   0,
+		Method:   method,
 		Frontend: frontend,
 		Backend:  backend,
 		Service:  service,
@@ -398,6 +402,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 
 func (gw *ApiGatewayRegistrant) registerRouter() error {
 	for _, r := range gw.router {
+		var frontend string
 		var kvs map[string]interface{}
 		var ori map[string]interface{}
 		kvs = make(map[string]interface{})
@@ -408,11 +413,16 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 			logger.Exception(err)
 			return err
 		}
+		if strings.Index(r.Frontend, "/") == 0 {
+			frontend = r.Method + "@" + r.Frontend
+		} else {
+			frontend = r.Method + "@/" + r.Frontend
+		}
 		if resp.Count == 0 {
 			kvs[routerName+IDKey] = r.ID
 			kvs[routerName+NameKey] = r.Name
 			kvs[routerName+StatusKey] = strconv.FormatUint(uint64(r.Status), 10)
-			kvs[routerName+FrontendKey] = r.Frontend
+			kvs[routerName+FrontendKey] = frontend
 			kvs[routerName+BackendKey] = r.Backend
 			kvs[routerName+ServiceKey] = r.Service.Name
 		} else {
@@ -430,8 +440,8 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 					}
 					ori[routerName+NameKey] = kv.Value
 				} else if bytes.Equal(kv.Key, []byte(routerName+FrontendKey)) {
-					if !bytes.Equal(kv.Value, []byte(r.Frontend)) {
-						kvs[routerName+FrontendKey] = r.Frontend
+					if !bytes.Equal(kv.Value, []byte(frontend)) {
+						kvs[routerName+FrontendKey] = frontend
 					}
 					ori[routerName+FrontendKey] = kv.Value
 				} else if bytes.Equal(kv.Key, []byte(routerName+BackendKey)) {

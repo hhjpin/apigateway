@@ -478,10 +478,11 @@ func (ep *Endpoint) setStatus(status Status) {
 	ep.status = status
 }
 
-func (r *Table) Select(input []byte) (TargetServer, error) {
+func (r *Table) Select(input []byte, method []byte) (TargetServer, error) {
 	var replacedBackendUri []byte
 	var matchRouter *Router
 
+	input = []byte(string(method) + "@" + string(input))
 	inputByteSlice := bytes.Split(input, UriSlash)
 	r.onlineTable.Range(func(key *FrontendApi, value *Router) bool {
 		matched, replaced := match(inputByteSlice, key.pattern, value.backendApi.pattern)
@@ -529,7 +530,17 @@ func (r *Table) Select(input []byte) (TargetServer, error) {
 	return TargetServer{}, errors.New(141)
 }
 
-func match(input, pattern [][]byte, backend [][]byte) (bool, []byte) {
+func match(input, pattern, backend [][]byte) (bool, []byte) {
+	/*for i,d := range input {
+		fmt.Println("input:", i, string(d))
+	}
+	for i,d := range pattern {
+		fmt.Println("pattern:", i, string(d))
+	}
+	for i,d := range backend {
+		fmt.Println("backend:", i, string(d))
+	}
+	fmt.Println("match:", input, pattern, backend)*/
 	inputLen := len(input)
 	patternLen := len(pattern)
 	if inputLen == patternLen {
