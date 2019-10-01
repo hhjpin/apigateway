@@ -489,12 +489,15 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 func (gw *ApiGatewayRegistrant) Register() error {
 	if err := gw.registerNode(); err != nil {
 		logger.Exception(err)
+		return err
 	}
 	if err := gw.registerService(); err != nil {
 		logger.Exception(err)
+		return err
 	}
 	if err := gw.registerRouter(); err != nil {
 		logger.Exception(err)
+		return err
 	}
 	return nil
 }
