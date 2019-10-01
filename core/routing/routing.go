@@ -37,6 +37,7 @@ const (
 var (
 	VariableIdentifier = []byte(":")
 	UriSlash           = []byte("/")
+	AnyMatcher         = []byte("*any")
 )
 
 type Status uint8
@@ -563,7 +564,11 @@ func match(input, pattern, backend [][]byte) (bool, []byte) {
 			}
 		}
 		return true, bytes.Join(tmp, constant.SlashBytes)
-	} else {
-		return false, nil
 	}
+
+	if inputLen > 0 && patternLen > 1 && bytes.Equal(input[0], pattern[0]) && bytes.Equal(pattern[1], AnyMatcher) {
+		return true, bytes.Join(input[1:], constant.SlashBytes)
+	}
+
+	return false, nil
 }
