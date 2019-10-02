@@ -172,11 +172,13 @@ func (gw *ApiGatewayRegistrant) putKeyValue(key, value string, opts ...clientv3.
 func (gw *ApiGatewayRegistrant) putMany(kv interface{}, opts ...clientv3.OpOption) error {
 	if gw.cli == nil {
 		logger.Error("etcd client need initialize")
+		return errors.New("etcd client need initialize")
 	}
 	cli := gw.cli
 
 	kvs, ok := kv.(map[string]interface{})
 	if !ok {
+		logger.Error("wrong type of kv mapping")
 		return errors.New("wrong type of kv mapping")
 	}
 
@@ -198,6 +200,7 @@ func (gw *ApiGatewayRegistrant) putMany(kv interface{}, opts ...clientv3.OpOptio
 			}
 		} else {
 			cancel()
+			logger.Errorf("wrong type of kv mapping value %T", v)
 			return errors.New("wrong type of kv mapping value")
 		}
 	}
@@ -428,10 +431,10 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 		} else {
 			for _, kv := range resp.Kvs {
 				if bytes.Equal(kv.Key, []byte(routerName+StatusKey)) {
-					ori[routerName+StatusKey] = kv.Value
+					ori[routerName+StatusKey] = string(kv.Value)
 				} else if bytes.Equal(kv.Key, []byte(routerName+IDKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.ID)) {
-						kvs[routerName+IDKey] = kv.Value
+						kvs[routerName+IDKey] = string(kv.Value)
 					}
 					ori[routerName+IDKey] = r.ID
 				} else if bytes.Equal(kv.Key, []byte(routerName+NameKey)) {
@@ -489,12 +492,15 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 func (gw *ApiGatewayRegistrant) Register() error {
 	if err := gw.registerNode(); err != nil {
 		logger.Exception(err)
+		return err
 	}
 	if err := gw.registerService(); err != nil {
 		logger.Exception(err)
+		return err
 	}
 	if err := gw.registerRouter(); err != nil {
 		logger.Exception(err)
+		return err
 	}
 	return nil
 }
