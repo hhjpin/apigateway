@@ -36,8 +36,8 @@ const (
 
 var (
 	VariableIdentifier = []byte(":")
+	AnyMatchIdentifier = []byte("*")
 	UriSlash           = []byte("/")
-	AnyMatcher         = []byte("*any")
 )
 
 type Status uint8
@@ -544,16 +544,23 @@ func match(input, pattern, backend [][]byte) (bool, []byte) {
 	fmt.Println("match:", input, pattern, backend)*/
 	inputLen := len(input)
 	patternLen := len(pattern)
+	if inputLen >= patternLen {
+		for i := 0; i < patternLen; i++ {
+			if bytes.HasPrefix(pattern[i], AnyMatchIdentifier) {
+				return true, bytes.Join(input[1:], constant.SlashBytes)
+			} else if !bytes.Equal(pattern[i], input[i]) {
+				break
+			}
+		}
+	}
 	if inputLen == patternLen {
 		var tmp [][]byte
 		replaced := make(map[string][]byte)
 		for i := 0; i < patternLen; i++ {
 			if bytes.HasPrefix(pattern[i], VariableIdentifier) {
 				replaced[string(pattern[i])] = input[i]
-			} else {
-				if !bytes.Equal(pattern[i], input[i]) {
-					return false, nil
-				}
+			} else if !bytes.Equal(pattern[i], input[i]) {
+				return false, nil
 			}
 		}
 		for _, b := range backend {
@@ -565,10 +572,5 @@ func match(input, pattern, backend [][]byte) (bool, []byte) {
 		}
 		return true, bytes.Join(tmp, constant.SlashBytes)
 	}
-
-	if inputLen > 0 && patternLen > 1 && bytes.Equal(input[0], pattern[0]) && bytes.Equal(pattern[1], AnyMatcher) {
-		return true, bytes.Join(input[1:], constant.SlashBytes)
-	}
-
 	return false, nil
 }

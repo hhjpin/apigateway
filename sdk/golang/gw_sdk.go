@@ -258,8 +258,9 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 		if host != n.Host {
 			kvs[nodeDefinition+HostKey] = n.Host
 		}
-		if port != strconv.FormatInt(int64(n.Port), 10) {
-			kvs[nodeDefinition+PortKey] = n.Port
+		setPort := strconv.FormatInt(int64(n.Port), 10)
+		if port != setPort {
+			kvs[nodeDefinition+PortKey] = setPort
 		}
 		if healthCheck != n.HC.ID {
 			kvs[nodeDefinition+HealthCheckKey] = n.HC.ID
@@ -479,6 +480,7 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 				}
 			}
 		}
+		//todo 新增删除无用的路由信息
 		err = gw.putMany(kvs)
 		if err != nil {
 			logger.Exception(err)
