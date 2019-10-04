@@ -445,12 +445,17 @@ func (r *Table) CreateRouter(name string, key string) error {
 	return nil
 }
 
-func (r *Table) RefreshRouter(name string, key string) error {
+//not use in routerTable
+func (r *Table) RefreshRouterByName(name string, key string) error {
 	router, err := r.GetRouterByName([]byte(name))
 	if err != nil {
 		// can not find router in routing table, try to generate a new one
 		return r.CreateRouter(name, key)
 	}
+	return r.RefreshRouter(router, key)
+}
+
+func (r *Table) RefreshRouter(router *Router, key string) error {
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
 		logger.Exception(err)
@@ -669,7 +674,7 @@ func (r *Table) RefreshService(name string, key string) error {
 					r.onlineTable.Delete(value.frontendApi)
 				}
 			}
-			if err := r.RefreshRouter(string(value.name), fmt.Sprintf("/Router/Router-%s/", string(value.name))); err != nil {
+			if err := r.RefreshRouter(value, fmt.Sprintf("/Router/Router-%s/", string(value.name))); err != nil {
 				logger.Exception(err)
 			}
 		}

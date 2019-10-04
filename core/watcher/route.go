@@ -58,14 +58,14 @@ func (r *RouteWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 			logger.Warningf("new route lack attribute, it may not have been created yet. Suggest to wait")
 			return nil
 		} else {
-			if err := r.table.RefreshRouter(routeName, routeKey); err != nil {
+			if err := r.table.RefreshRouterByName(routeName, routeKey); err != nil {
 				logger.Exception(err)
 				return err
 			}
 			return nil
 		}
 	} else {
-		if err := r.table.RefreshRouter(routeName, routeKey); err != nil {
+		if err := r.table.RefreshRouterByName(routeName, routeKey); err != nil {
 			logger.Exception(err)
 			return err
 		}
