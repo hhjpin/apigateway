@@ -1,6 +1,8 @@
 package golang
 
 const (
+	RouterDefinitionPrefix = "/Router/"
+
 	NodeDefinition        = "/Node/Node-%s/"
 	ServiceDefinition     = "/Service/Service-%s/"
 	HealthCheckDefinition = "/HealthCheck/HC-%s/"
@@ -21,4 +23,10 @@ const (
 	FrontendKey    = "FrontendApi"
 	BackendKey     = "BackendApi"
 	ServiceKey     = "Service"
+)
+
+var (
+	SlashBytes            = []byte("/")
+	RouterDefinitionBytes = []byte("/Router/")
+	RouterPrefixBytes     = []byte("Router-")
 )

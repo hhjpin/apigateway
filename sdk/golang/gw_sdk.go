@@ -99,17 +99,15 @@ func NewService(name string, node *Node) *Service {
 
 func NewRouter(name, method, frontend, backend string, service *Service) *Router {
 	method = strings.ToUpper(method)
-	src := fmt.Sprintf("%s-%s-%s-%s-%s", name, method, frontend, backend, service.Name)
+	src := fmt.Sprintf("%s - %s - %s - %s - %s", name, method, frontend, backend, service.Name)
 	fmt.Println(">> GATE route: ", src)
 	if strings.Contains(name, "/") {
 		logger.Errorf("name can not contains '/'")
 		os.Exit(-1)
 	}
-	data := []byte(src)
-	hashed := md5.Sum(data)
-	md5str1 := fmt.Sprintf("%x", hashed)
+	md5str := fmt.Sprintf("%x", md5.Sum([]byte(src)))
 	return &Router{
-		ID:       md5str1,
+		ID:       md5str,
 		Name:     name,
 		Status:   0,
 		Method:   method,
@@ -132,6 +130,7 @@ func NewApiGatewayRegistrant(cli *clientv3.Client, node *Node, service *Service,
 func (gw *ApiGatewayRegistrant) getKeyValue(key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
 	if gw.cli == nil {
 		logger.Error("etcd client need initialize")
+		return nil, errors.New("etcd client need initialize")
 	}
 	cli := gw.cli
 
@@ -144,6 +143,7 @@ func (gw *ApiGatewayRegistrant) getKeyValue(key string, opts ...clientv3.OpOptio
 func (gw *ApiGatewayRegistrant) getKeyValueWithPrefix(key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
 	if gw.cli == nil {
 		logger.Error("etcd client need initialize")
+		return nil, errors.New("etcd client need initialize")
 	}
 	cli := gw.cli
 
@@ -158,6 +158,7 @@ func (gw *ApiGatewayRegistrant) getKeyValueWithPrefix(key string, opts ...client
 func (gw *ApiGatewayRegistrant) putKeyValue(key, value string, opts ...clientv3.OpOption) (*clientv3.PutResponse, error) {
 	if gw.cli == nil {
 		logger.Error("etcd client need initialize")
+		return nil, errors.New("etcd client need initialize")
 	}
 	cli := gw.cli
 
@@ -200,9 +201,40 @@ func (gw *ApiGatewayRegistrant) putMany(kv interface{}, opts ...clientv3.OpOptio
 			}
 		} else {
 			cancel()
-			logger.Errorf("wrong type of kv mapping value %T", v)
+			logger.Errorf("wrong type of kv mapping value: %T", v)
 			return errors.New("wrong type of kv mapping value")
 		}
+	}
+	cancel()
+	return nil
+}
+
+func (gw *ApiGatewayRegistrant) deleteMany(k interface{}, opts ...clientv3.OpOption) error {
+	if gw.cli == nil {
+		logger.Error("etcd client need initialize")
+		return errors.New("etcd client need initialize")
+	}
+	cli := gw.cli
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if sliceValue, ok := k.([]string); ok {
+		for _, v := range sliceValue {
+			_, err := cli.Delete(ctx, v, opts...)
+			if err != nil {
+				cancel()
+				return err
+			}
+		}
+	} else if strValue, ok := k.(string); ok {
+		_, err := cli.Delete(ctx, strValue, opts...)
+		if err != nil {
+			cancel()
+			return err
+		}
+	} else {
+		cancel()
+		logger.Errorf("wrong type of kv mapping value: %T", k)
+		return errors.New("wrong type of kv mapping value")
 	}
 	cancel()
 	return nil
@@ -405,6 +437,11 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 }
 
 func (gw *ApiGatewayRegistrant) registerRouter() error {
+	if err := gw.deleteInvalidRoutes(); err != nil {
+		logger.Exception(err)
+		return err
+	}
+
 	for _, r := range gw.router {
 		var frontend string
 		var kvs map[string]interface{}
@@ -480,14 +517,54 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 				}
 			}
 		}
-		//todo 新增删除无用的路由信息
-		err = gw.putMany(kvs)
-		if err != nil {
+
+		if err = gw.putMany(kvs); err != nil {
 			logger.Exception(err)
 			return err
 		}
 	}
 
+	return nil
+}
+
+func (gw *ApiGatewayRegistrant) deleteInvalidRoutes() error {
+	resp, err := gw.getKeyValueWithPrefix(RouterDefinitionPrefix)
+	if err != nil {
+		logger.Exception(err)
+		return err
+	}
+
+	invalidMap := map[string]bool{}
+	setRouteMap := map[string]*Router{}
+	for _, v := range gw.router {
+		setRouteMap[v.Name] = v
+	}
+	for _, kv := range resp.Kvs {
+		key := bytes.TrimPrefix(kv.Key, RouterDefinitionBytes)
+		tmpSlice := bytes.Split(key, SlashBytes)
+		if len(tmpSlice) != 2 {
+			logger.Warningf("invalid router definition: %s", key)
+			continue
+		}
+		rName := string(bytes.TrimPrefix(tmpSlice[0], RouterPrefixBytes))
+		//attr := tmpSlice[1]
+		if setRouteMap[rName] == nil {
+			routerName := fmt.Sprintf(RouterDefinition, rName)
+			invalidMap[routerName] = true
+		}
+	}
+
+	invalidKeys := make([]string, 0, len(invalidMap))
+	for k := range invalidMap {
+		invalidKeys = append(invalidKeys, k)
+		logger.Info("delete invalid router:", k)
+	}
+
+	err = gw.deleteMany(invalidKeys, clientv3.WithPrefix())
+	if err != nil {
+		logger.Exception(err)
+		return err
+	}
 	return nil
 }
 

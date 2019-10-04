@@ -52,7 +52,7 @@ func (r *RouteWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 	routeName := tmp[0]
 	routeKey := r.prefix + fmt.Sprintf("Router-%s/", routeName)
-	logger.Debugf("新的Router写入事件, name: %s, key: %s", routeName, routeKey)
+	logger.Debugf("新的Router写入事件, name: %s, key: %s", routeName, string(kv.Key))
 	if isCreate {
 		if ok, err := validKV(r.cli, routeKey, r.attrs, false); err != nil || !ok {
 			logger.Warningf("new route lack attribute, it may not have been created yet. Suggest to wait")
@@ -81,19 +81,19 @@ func (r *RouteWatcher) Delete(kv *mvccpb.KeyValue) error {
 		return errors.NewFormat(200, fmt.Sprintf("invalid router key: %s", string(kv.Key)))
 	}
 	routeName := tmp[0]
-	routeKey := r.prefix + fmt.Sprintf("Router-%s/", routeName)
-	logger.Debugf("新的Router删除事件, name: %s, key: %s", routeName, routeKey)
+	//routeKey := r.prefix + fmt.Sprintf("Router-%s/", routeName)
+	logger.Debugf("新的Router删除事件, name: %s, key: %s", routeName, string(kv.Key))
 
-	if ok, err := validKV(r.cli, routeKey, r.attrs, true); err != nil || !ok {
-		logger.Warningf("route attribute still exists, it may not have been deleted yet. Suggest to wait")
-		return nil
-	} else {
-		if err := r.table.DeleteRouter(routeName); err != nil {
-			logger.Exception(err)
-			return err
-		}
-		return nil
+	//if ok, err := validKV(r.cli, routeKey, r.attrs, true); err != nil || !ok {
+	//	logger.Warningf("route attribute still exists, it may not have been deleted yet. Suggest to wait")
+	//	return nil
+	//} else {
+	if err := r.table.DeleteRouter(routeName); err != nil {
+		logger.Exception(err)
+		return err
 	}
+	return nil
+	//}
 }
 
 func (r *RouteWatcher) BindTable(table *routing.Table) {

@@ -300,81 +300,52 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 		} else {
 			rName := bytes.TrimPrefix(tmpSlice[0], constant.RouterPrefixBytes)
 			attr := tmpSlice[1]
-			if r, ok := rtMap.Load(RouterNameString(rName)); ok {
-				if bytes.Equal(attr, constant.IdKeyBytes) {
-					// do nothing
-				} else if bytes.Equal(attr, constant.NameKeyBytes) {
-					if !bytes.Equal(rName, kv.Value) {
-						logger.Warningf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
-						continue
-					}
-					r.name = kv.Value
-				} else if bytes.Equal(attr, constant.FrontendApiKeyBytes) {
-					r.frontendApi = &FrontendApi{
-						path:       kv.Value,
-						pathString: FrontendApiString(kv.Value),
-						pattern:    bytes.Split(kv.Value, constant.SlashBytes),
-					}
-				} else if bytes.Equal(attr, constant.BackendApiKeyBytes) {
-					r.backendApi = &BackendApi{
-						path:       kv.Value,
-						pathString: BackendApiString(kv.Value),
-						pattern:    bytes.Split(kv.Value, constant.SlashBytes),
-					}
-				} else if bytes.Equal(attr, constant.ServiceKeyBytes) {
-					if svr, ok := svrMap.Load(ServiceNameString(kv.Value)); ok {
-						r.service = svr
-					} else {
-						logger.Errorf("service not exist")
-						continue
-					}
-				} else if bytes.Equal(attr, constant.StatusKeyBytes) {
-					// do nothing
-				} else {
-					logger.Warningf("unrecognized health check attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
+			r, ok := rtMap.Load(RouterNameString(rName))
+			if !ok {
+				r = &Router{}
+				rtMap.Store(RouterNameString(rName), r)
+			}
+			if bytes.Equal(attr, constant.IdKeyBytes) {
+				// do nothing
+			} else if bytes.Equal(attr, constant.NameKeyBytes) {
+				if !bytes.Equal(rName, kv.Value) {
+					logger.Warningf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
+					continue
 				}
+				r.name = kv.Value
+			} else if bytes.Equal(attr, constant.FrontendApiKeyBytes) {
+				r.frontendApi = &FrontendApi{
+					path:       kv.Value,
+					pathString: FrontendApiString(kv.Value),
+					pattern:    bytes.Split(kv.Value, constant.SlashBytes),
+				}
+			} else if bytes.Equal(attr, constant.BackendApiKeyBytes) {
+				r.backendApi = &BackendApi{
+					path:       kv.Value,
+					pathString: BackendApiString(kv.Value),
+					pattern:    bytes.Split(kv.Value, constant.SlashBytes),
+				}
+			} else if bytes.Equal(attr, constant.ServiceKeyBytes) {
+				if svr, ok := svrMap.Load(ServiceNameString(kv.Value)); ok {
+					r.service = svr
+				} else {
+					logger.Errorf("service not exist")
+					continue
+				}
+			} else if bytes.Equal(attr, constant.StatusKeyBytes) {
+				// do nothing
 			} else {
-				tmpRouter := Router{}
-				if bytes.Equal(attr, constant.IdKeyBytes) {
-					// do nothing
-				} else if bytes.Equal(attr, constant.NameKeyBytes) {
-					if !bytes.Equal(rName, kv.Value) {
-						logger.Warningf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
-						continue
-					} else {
-						tmpRouter.name = rName
-					}
-					rtMap.Store(RouterNameString(rName), &tmpRouter)
-				} else if bytes.Equal(attr, constant.FrontendApiKeyBytes) {
-					tmpRouter.frontendApi = &FrontendApi{
-						path:       kv.Value,
-						pathString: FrontendApiString(kv.Value),
-						pattern:    bytes.Split(kv.Value, constant.SlashBytes),
-					}
-					rtMap.Store(RouterNameString(rName), &tmpRouter)
-				} else if bytes.Equal(attr, constant.BackendApiKeyBytes) {
-					tmpRouter.backendApi = &BackendApi{
-						path:       kv.Value,
-						pathString: BackendApiString(kv.Value),
-						pattern:    bytes.Split(kv.Value, constant.SlashBytes),
-					}
-					rtMap.Store(RouterNameString(rName), &tmpRouter)
-				} else if bytes.Equal(attr, constant.ServiceKeyBytes) {
-					if svr, ok := svrMap.Load(ServiceNameString(kv.Value)); ok {
-						tmpRouter.service = svr
-						rtMap.Store(RouterNameString(rName), &tmpRouter)
-					} else {
-						logger.Error("service not exist")
-						continue
-					}
-				} else {
-					logger.Warningf("unrecognized health check attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
-				}
+				logger.Warningf("unrecognized health check attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
 			}
 		}
 	}
 
 	rtMap.Range(func(key RouterNameString, value *Router) {
+		if value.frontendApi == nil {
+			delete(rtMap.internal, key)
+			logger.Errorf("route %s: not have total attr: frontendApi", key)
+			return
+		}
 		artMap.Store(value.frontendApi.pathString, value)
 	})
 	return rtMap, artMap, nil
@@ -429,6 +400,12 @@ func (r *Table) CreateRouter(name string, key string) error {
 			return errors.NewFormat(200, fmt.Sprintf("unsupported router attribute: %s", keyStr))
 		}
 	}
+
+	if router.frontendApi == nil {
+		logger.Warningf("router %s frontendApi is not ready", name)
+		return errors.New(126)
+	}
+
 	r.table.Store(router.frontendApi.pathString, router)
 	r.routerTable.Store(RouterNameString(router.name), router)
 	confirm, _ := router.service.checkEndpointStatus(Online)
@@ -533,6 +510,7 @@ func (r *Table) DeleteRouter(name string) error {
 	r.table.Delete(router.frontendApi.pathString)
 	r.routerTable.Delete(RouterNameString(router.name))
 	r.onlineTable.Delete(router.frontendApi)
+	logger.Debugf("route delete successful: %s", name)
 	return nil
 }
 
