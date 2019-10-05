@@ -9,18 +9,12 @@ type SummeryModel struct {
 }
 
 type SummeryResp struct {
-	Table       *routing.Table   `json:"table"`
-	Route       *RouteInfo       `json:"route"`
-	Service     *ServiceInfo     `json:"service"`
-	Node        *NodeInfo        `json:"node"`
-	HealthCheck *HealthCheckInfo `json:"health_check"`
+	Table *routing.TableInfo `json:"table"`
 }
 
 func (m *SummeryModel) GetSummery() (*SummeryResp, error) {
-	//var err error
-	res := &SummeryResp{}
-
-	res.Table = m.Table
-
+	res := &SummeryResp{
+		Table: m.Table.GetTableInfo(),
+	}
 	return res, nil
 }
