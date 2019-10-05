@@ -31,7 +31,7 @@ type Config struct {
 		Name                string `yaml:"Name"`
 		MaxConnsPerHost     int    `yaml:"MaxConnsPerHost"`
 		MaxIdleConnDuration int    `yaml:"MaxIdleConnDuration"`
-	} `yaml:"Client"`
+	} `yaml:"client"`
 
 	Etcd struct {
 		Name      string   `yaml:"Name"`
@@ -72,6 +72,15 @@ type Config struct {
 			} `yaml:"Redis"`
 		} `yaml:"Auth"`
 	} `yaml:"Middleware"`
+
+	DashBoard struct {
+		Enable       bool   `yaml:"Enable"`
+		ListenHost   string `yaml:"ListenHost"`
+		ListenPort   int    `yaml:"ListenPort"`
+		RoutePrefix  string `yaml:"RoutePrefix"`
+		RequestModel string `yaml:"RequestModel"`
+		Token        string `yaml:"Token"`
+	} `yaml:"DashBoard"`
 }
 
 var (

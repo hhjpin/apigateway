@@ -73,3 +73,15 @@ Middleware:
       Host: 127.0.0.1:3379
       DB: 0
       Password: your password
+
+DashBoard:
+  Enable: true
+  ListenHost: "0.0.0.0"
+  ListenPort: 8801
+
+  RoutePrefix: "/api/v1/gw"
+  #debug release test
+  RequestModel: "debug"
+
+  # request Authorization，like "Bearer xxx", if empty not check auth
+  Token: ""

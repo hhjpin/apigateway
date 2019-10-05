@@ -1,16 +1,18 @@
-package main
+package dashboard
 
 import (
 	"bytes"
 	"fmt"
+	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
 	"git.henghajiang.com/backend/golang_utils"
-	"github.com/coreos/etcd/clientv3"
+	"git.henghajiang.com/backend/golang_utils/response"
 	"github.com/gin-gonic/gin"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/http/httputil"
-	"os"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -29,19 +31,6 @@ var (
 	cyan      = "\033[0;36m"
 	lightCyan = "\033[1;36m"
 )
-
-func ConnectToEtcd() *clientv3.Client {
-	cli, err := clientv3.New(
-		clientv3.Config{
-			Endpoints: []string{"127.0.0.1:2379"},
-		},
-	)
-	if err != nil {
-		logger.Exception(err)
-		os.Exit(-1)
-	}
-	return cli
-}
 
 func timeFormat(t time.Time) string {
 	var timeString = t.Format("2006/01/02 - 15:04:05")
@@ -109,6 +98,24 @@ func CrossDomain() gin.HandlerFunc {
 	}
 }
 
+func Auth(token string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if token == "" {
+			c.Next()
+			return
+		}
+		auth := c.GetHeader("Authorization")
+		authArr := strings.SplitN(auth, " ", 2)
+		if len(authArr) < 2 || authArr[1] != token {
+			var resp response.BaseResponse
+			resp.Init(3)
+			c.JSON(http.StatusOK, resp)
+			c.Abort()
+		}
+		c.Next()
+	}
+}
+
 func Recovery() gin.HandlerFunc {
 	return RecoveryWithWriter()
 }
@@ -165,9 +172,10 @@ func colorForMethod(method string) string {
 	}
 }
 
-func DB() gin.HandlerFunc {
-	return func(context *gin.Context) {
-		context.Set("cli", etcdClient)
+func Table(table *routing.Table) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set("table", table)
+		c.Next()
 	}
 }
 

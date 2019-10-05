@@ -62,13 +62,7 @@ func main() {
 		c.Redirect(308, "http://127.0.0.1/test/redirect")
 	})
 
-	node := golang.NewNode("127.0.0.1", *flagPort, golang.NewHealthCheck(
-		"/check",
-		10,
-		5,
-		3,
-		true,
-	))
+	node := golang.NewNode("127.0.0.1", *flagPort, golang.NewHealthCheck("/check", 10, 5, 3, true))
 	svr := golang.NewService("test", node)
 	gw := golang.NewApiGatewayRegistrant(
 		ConnectToEtcd(),
@@ -80,11 +74,12 @@ func main() {
 			golang.NewRouter("test3", "POST", "/rd", "/redirect", svr),
 		},
 	)
-	go func(g *golang.ApiGatewayRegistrant) {
-		if err := g.Register(); err != nil {
-			logger.Exception(err)
-		}
-	}(&gw)
+
+	if err := gw.Register(); err != nil {
+		logger.Exception(err)
+		return
+	}
+
 	go exit(&gw)
 	if err := r.Run(fmt.Sprintf(":%d", *flagPort)); err != nil {
 		logger.Exception(err)
