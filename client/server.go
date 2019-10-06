@@ -1,10 +1,10 @@
-package dashboard
+package client
 
 import (
 	"fmt"
+	"git.henghajiang.com/backend/api_gateway_v2/client/hander"
 	"git.henghajiang.com/backend/api_gateway_v2/conf"
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
-	"git.henghajiang.com/backend/api_gateway_v2/dashboard/hander"
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/gin-gonic/gin"
 	"net/http"

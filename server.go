@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"git.henghajiang.com/backend/api_gateway_v2/client"
 	"git.henghajiang.com/backend/api_gateway_v2/conf"
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
 	"git.henghajiang.com/backend/api_gateway_v2/core/watcher"
-	"git.henghajiang.com/backend/api_gateway_v2/dashboard"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
@@ -97,7 +97,7 @@ func init() {
 	watcher.Mapping[healthCheckWatcher] = healthCheckWatcher.WatchChan
 	go table.HealthCheck()
 	go watcher.Watch(watcher.Mapping)
-	go dashboard.Run(table)
+	go client.Run(table)
 }
 
 func main() {

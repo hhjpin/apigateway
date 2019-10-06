@@ -68,7 +68,7 @@ func GetPrefixKV(cli *clientv3.Client, key string, opts ...clientv3.OpOption) (*
 	resp, err := cli.Get(ctx, key, opts...)
 	cancel()
 	if err != nil {
-		logger.Debugf("GetKV error: %s", err)
+		logger.Errorf("GetKV error: %s", err.Error())
 	}
 	return resp, err
 }

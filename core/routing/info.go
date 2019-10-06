@@ -11,7 +11,7 @@ type RouteInfo struct {
 type ServiceInfo struct {
 	Name             string               `json:"name"`
 	Endpoint         []EndpointNameString `json:"endpoint"`
-	AcceptHttpMethod []string
+	AcceptHttpMethod []string             `json:"accept_http_method"`
 }
 
 type HealthCheckInfo struct {

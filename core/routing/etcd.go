@@ -77,6 +77,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 	resp, err := utils.GetPrefixKV(cli, constant.ServiceDefinition, clientv3.WithPrefix())
 	if err != nil {
 		logger.Exception(err)
+		return svrMap, epMap, err
 	}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, constant.ServiceDefinitionBytes)
