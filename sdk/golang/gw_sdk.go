@@ -547,10 +547,14 @@ func (gw *ApiGatewayRegistrant) deleteInvalidRoutes() error {
 			continue
 		}
 		rName := string(bytes.TrimPrefix(tmpSlice[0], RouterPrefixBytes))
-		//attr := tmpSlice[1]
-		if setRouteMap[rName] == nil {
-			routerName := fmt.Sprintf(RouterDefinition, rName)
-			invalidMap[routerName] = true
+		attr := tmpSlice[1]
+		if bytes.Equal(attr, ServiceKeyBytes) {
+			if string(kv.Value) == gw.service.Name {
+				if setRouteMap[rName] == nil {
+					routerName := fmt.Sprintf(RouterDefinition, rName)
+					invalidMap[routerName] = true
+				}
+			}
 		}
 	}
 

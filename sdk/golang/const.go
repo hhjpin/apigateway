@@ -29,4 +29,5 @@ var (
 	SlashBytes            = []byte("/")
 	RouterDefinitionBytes = []byte("/Router/")
 	RouterPrefixBytes     = []byte("Router-")
+	ServiceKeyBytes       = []byte("Service")
 )
