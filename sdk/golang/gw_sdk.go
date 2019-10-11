@@ -511,7 +511,7 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 				logger.Infof("router keys waiting to be updated: %+v", kvs)
 				if ori[routerName+StatusKey] == "1" {
 					// original router still alive, can not modify router
-					logger.Warning("original router still alive, can not modify router")
+					logger.Warning("original router still alive, can not modify router: ", routerName)
 					logger.Warning("if need modify online router, please use a new one instead")
 					os.Exit(-1)
 				}
