@@ -46,7 +46,7 @@ var (
 	//StrExpect           = []byte("Expect")
 	//StrConnection       = []byte("Connection")
 	//StrContentLength    = []byte("Content-Length")
-	//StrContentType      = []byte("Content-Type")
+	StrContentType = []byte("Content-Type")
 	//StrDate             = []byte("Date")
 	StrHost = []byte("Host")
 	//StrReferer          = []byte("Referer")

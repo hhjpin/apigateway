@@ -143,6 +143,8 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	ctx.Request.Header.VisitAll(func(key, value []byte) {
 		if bytes.Equal(key, constant.StrHost) {
 			// pass
+		} else if bytes.Equal(key, constant.StrContentType) {
+			revReq.Header.SetContentTypeBytes(value)
 		} else {
 			revReq.Header.AddBytesKV(key, value)
 		}
