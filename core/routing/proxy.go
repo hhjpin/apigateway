@@ -63,52 +63,48 @@ func MainRequestHandlerWrapper(table *Table, middle ...middleware.Middleware) fa
 }
 
 func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
-	var target TargetServer
-
 	revReq := fasthttp.AcquireRequest()
 	revReqUri := fasthttp.AcquireURI()
 	revRes := fasthttp.AcquireResponse()
-	revReqHeader := make(map[string]string)
-	revReqUrlParam := make(map[string]string)
 
 	defer fasthttp.ReleaseRequest(revReq)
 	defer fasthttp.ReleaseResponse(revRes)
 	defer fasthttp.ReleaseURI(revReqUri)
 
-	defer func() {
-		//var resContentType []byte
-		//
-		//if revRes != nil {
-		//	resContentType = revRes.Header.ContentType()
-		//}
-		//
-		//counting := middleware.NewCounting(
-		//	ctx.ConnTime().UnixNano(),
-		//	time.Now().UnixNano(),
-		//	ctx.Path(),
-		//	ctx.Method(),
-		//	target.svr,
-		//	target.host,
-		//	target.uri,
-		//	ctx.Request.Header.ContentType(),
-		//	resContentType,
-		//	revReqHeader,
-		//	revReqUrlParam,
-		//	ctx.Response.StatusCode(),
-		//	ctx.Request.Body(),
-		//	ctx.Response.Body(),
-		//)
-		//go func() {
-		//	hashed := murmur.Sum32(strconv.FormatUint(ctx.ConnID(), 10)) % middleware.CountingShardNumber
-		//	timer := time.NewTimer(5 * time.Second)
-		//	select {
-		//	case <-timer.C:
-		//		logger.Warning("Counting channel maybe full")
-		//	case middleware.CountingCh[hashed] <- counting:
-		//		// pass
-		//	}
-		//}()
-	}()
+	//defer func() {
+	//var resContentType []byte
+	//
+	//if revRes != nil {
+	//	resContentType = revRes.Header.ContentType()
+	//}
+	//
+	//counting := middleware.NewCounting(
+	//	ctx.ConnTime().UnixNano(),
+	//	time.Now().UnixNano(),
+	//	ctx.Path(),
+	//	ctx.Method(),
+	//	target.svr,
+	//	target.host,
+	//	target.uri,
+	//	ctx.Request.Header.ContentType(),
+	//	resContentType,
+	//	revReqHeader,
+	//	revReqUrlParam,
+	//	ctx.Response.StatusCode(),
+	//	ctx.Request.Body(),
+	//	ctx.Response.Body(),
+	//)
+	//go func() {
+	//	hashed := murmur.Sum32(strconv.FormatUint(ctx.ConnID(), 10)) % middleware.CountingShardNumber
+	//	timer := time.NewTimer(5 * time.Second)
+	//	select {
+	//	case <-timer.C:
+	//		logger.Warning("Counting channel maybe full")
+	//	case middleware.CountingCh[hashed] <- counting:
+	//		// pass
+	//	}
+	//}()
+	//}()
 
 	routingTable := ctx.UserValue("Table")
 
@@ -148,7 +144,6 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		} else {
 			revReq.Header.AddBytesKV(key, value)
 		}
-		revReqHeader[string(key)] = string(value)
 	})
 
 	revReqUri.SetHostBytes(target.host)
@@ -158,9 +153,6 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	if queryString := ctx.QueryArgs().QueryString(); len(queryString) > 0 {
 		revReqUri.SetQueryStringBytes(queryString)
 	}
-	ctx.QueryArgs().VisitAll(func(key, value []byte) {
-		revReqUrlParam[string(key)] = string(value)
-	})
 	revReq.SetRequestURIBytes(revReqUri.FullURI())
 
 	if body := ctx.Request.Body(); len(body) > 0 {
