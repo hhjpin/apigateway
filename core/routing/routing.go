@@ -366,7 +366,7 @@ func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 		ep.setStatus(status)
 		return nil
 	default:
-		logger.Warningf("unrecognized status: %d", status.String())
+		logger.Warningf("unrecognized status: %s", status.String())
 		return nil
 	}
 }
@@ -532,45 +532,34 @@ func (r *Table) Select(input []byte, method []byte) (TargetServer, error) {
 }
 
 func match(input, pattern, backend [][]byte) (bool, []byte) {
-	/*for i,d := range input {
-		fmt.Println("input:", i, string(d))
-	}
-	for i,d := range pattern {
-		fmt.Println("pattern:", i, string(d))
-	}
-	for i,d := range backend {
-		fmt.Println("backend:", i, string(d))
-	}
-	fmt.Println("match:", input, pattern, backend)*/
 	inputLen := len(input)
 	patternLen := len(pattern)
 	if inputLen >= patternLen {
+		var target [][]byte
+		var hasAny bool
+		var replaced = make(map[string][]byte)
 		for i := 0; i < patternLen; i++ {
 			if bytes.HasPrefix(pattern[i], AnyMatchIdentifier) {
-				return true, bytes.Join(input[1:], constant.SlashBytes)
-			} else if !bytes.Equal(pattern[i], input[i]) {
+				replaced[string(pattern[i])] = bytes.Join(input[i:], UriSlash)
+				hasAny = true
 				break
-			}
-		}
-	}
-	if inputLen == patternLen {
-		var tmp [][]byte
-		replaced := make(map[string][]byte)
-		for i := 0; i < patternLen; i++ {
-			if bytes.HasPrefix(pattern[i], VariableIdentifier) {
+			} else if bytes.HasPrefix(pattern[i], VariableIdentifier) {
 				replaced[string(pattern[i])] = input[i]
 			} else if !bytes.Equal(pattern[i], input[i]) {
 				return false, nil
 			}
 		}
+		if !hasAny && inputLen != patternLen {
+			return false, nil
+		}
 		for _, b := range backend {
 			if r, ok := replaced[string(b)]; ok {
-				tmp = append(tmp, r)
+				target = append(target, r)
 			} else {
-				tmp = append(tmp, b)
+				target = append(target, b)
 			}
 		}
-		return true, bytes.Join(tmp, constant.SlashBytes)
+		return true, bytes.Join(target, UriSlash)
 	}
 	return false, nil
 }
