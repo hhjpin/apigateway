@@ -54,7 +54,7 @@ var (
 	//StrTransferEncoding = []byte("Transfer-Encoding")
 	//StrContentEncoding  = []byte("Content-Encoding")
 	//StrAcceptEncoding   = []byte("Accept-Encoding")
-	//StrUserAgent        = []byte("User-Agent")
+	StrUserAgent = []byte("User-Agent")
 	//StrCookie           = []byte("Cookie")
 	//StrSetCookie        = []byte("Set-Cookie")
 	//StrLocation         = []byte("Location")
