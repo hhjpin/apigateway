@@ -10,6 +10,7 @@ type RouteInfo struct {
 
 type ServiceInfo struct {
 	Name             string               `json:"name"`
+	Status           Status               `json:"status"`
 	Endpoint         []EndpointNameString `json:"endpoint"`
 	AcceptHttpMethod []string             `json:"accept_http_method"`
 }
@@ -71,6 +72,7 @@ func (r *Table) GetTableInfo() *TableInfo {
 	r.serviceTable.Range(func(k ServiceNameString, v *Service) bool {
 		t.ServiceTable[k] = &ServiceInfo{
 			Name:             string(v.name),
+			Status:           Offline,
 			Endpoint:         []EndpointNameString{},
 			AcceptHttpMethod: []string{},
 		}
@@ -79,6 +81,9 @@ func (r *Table) GetTableInfo() *TableInfo {
 		}
 		v.ep.Range(func(k1 EndpointNameString, k2 *Endpoint) bool {
 			t.ServiceTable[k].Endpoint = append(t.ServiceTable[k].Endpoint, k1)
+			if k2.status == Online {
+				t.ServiceTable[k].Status = Online
+			}
 			return false
 		})
 		return false
