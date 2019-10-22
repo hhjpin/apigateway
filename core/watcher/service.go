@@ -67,14 +67,14 @@ func (s *ServiceWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 			logger.Warningf("new service lack attribute, it may not have been created yet. Suggest to wait")
 			return nil
 		} else {
-			if err := s.table.RefreshService(svrName, svrKey); err != nil {
+			if err := s.table.RefreshServiceByName(svrName, svrKey); err != nil {
 				logger.Exception(err)
 				return err
 			}
 			return nil
 		}
 	} else {
-		if err := s.table.RefreshService(svrName, svrKey); err != nil {
+		if err := s.table.RefreshServiceByName(svrName, svrKey); err != nil {
 			logger.Exception(err)
 			return err
 		}

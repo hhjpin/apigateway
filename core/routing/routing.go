@@ -182,7 +182,7 @@ func (r *Table) GetEndpointByName(name []byte) (*Endpoint, error) {
 	return ep, nil
 }
 
-func (r *Table) GetEndpointById(id string) (*Endpoint, error) {
+func (r *Table) GetEndpointById(id string) (*Endpoint, bool) {
 	var ep *Endpoint
 	r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) bool {
 		if value.id == id {
@@ -191,7 +191,10 @@ func (r *Table) GetEndpointById(id string) (*Endpoint, error) {
 		}
 		return false
 	})
-	return ep, nil
+	if ep == nil {
+		return nil, false
+	}
+	return ep, true
 }
 
 func (r *Table) RemoveRouter(router *Router) (ok bool, err error) {

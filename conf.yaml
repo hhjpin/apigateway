@@ -80,7 +80,7 @@ DashBoard:
   ListenHost: "0.0.0.0"
   ListenPort: 8801
 
-  RoutePrefix: ""
+  RoutePrefix: "/api/v1/gw"
   RequestModel: "release"
 
   # request Authorization，like "Bearer xxx", if empty not check auth

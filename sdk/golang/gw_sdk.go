@@ -257,9 +257,16 @@ func (gw *ApiGatewayRegistrant) getAttr(key string) string {
 	}
 }
 
+func (gw *ApiGatewayRegistrant) deleteOldNode() error {
+	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
+	return gw.deleteMany(nodeDefinition, clientv3.WithPrefix())
+}
+
 func (gw *ApiGatewayRegistrant) registerNode() error {
-	var kvs map[string]interface{}
-	kvs = make(map[string]interface{})
+	if err := gw.deleteOldNode(); err != nil {
+		logger.Exception(err)
+		return err
+	}
 
 	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
 	resp, err := gw.getKeyValueWithPrefix(nodeDefinition)
@@ -268,6 +275,7 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 		return err
 	}
 	n := gw.node
+	kvs := make(map[string]interface{})
 	if resp.Count == 0 {
 		kvs[nodeDefinition+IDKey] = n.ID
 		kvs[nodeDefinition+NameKey] = n.Name

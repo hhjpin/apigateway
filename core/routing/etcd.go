@@ -579,11 +579,16 @@ func (r *Table) CreateService(name string, key string) error {
 	return nil
 }
 
-func (r *Table) RefreshService(name string, key string) error {
+//not use in serviceTable
+func (r *Table) RefreshServiceByName(name string, key string) error {
 	ori, ok := r.serviceTable.Load(ServiceNameString(name))
 	if !ok {
 		return r.CreateService(name, key)
 	}
+	return r.RefreshService(ori, key)
+}
+
+func (r *Table) RefreshService(ori *Service, key string) error {
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
 		logger.Exception(err)
@@ -676,66 +681,6 @@ func (r *Table) DeleteService(name string) error {
 		}
 	})
 	return nil
-}
-
-func (r *Table) GetEndpoint(id string, key string) (*Endpoint, error) {
-	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
-	if err != nil {
-		logger.Exception(err)
-		return nil, err
-	}
-	ep := &Endpoint{}
-	for _, kv := range resp.Kvs {
-		key := bytes.TrimPrefix(kv.Key, []byte(key))
-		if bytes.Contains(key, constant.SlashBytes) {
-			logger.Warningf("invalid endpoint attribute key")
-			return nil, errors.NewFormat(200, "invalid endpoint attribute key")
-		}
-		keyStr := string(key)
-		switch keyStr {
-		case constant.IdKeyString:
-			// is forbidden to modify node id
-			if id != string(kv.Value) {
-				logger.Warningf("node key is not in accord with node id, node: %s", key)
-				ep.id = id
-			} else {
-				ep.id = string(kv.Value)
-			}
-		case constant.NameKeyString:
-			ep.name = kv.Value
-			ep.nameString = EndpointNameString(kv.Value)
-		case constant.HostKeyString:
-			ep.host = kv.Value
-		case constant.PortKeyString:
-			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
-			if err != nil {
-				logger.Exception(err)
-				logger.Error("wrong type of endpoint port")
-				return nil, err
-			}
-			ep.port = int(tmp)
-		case constant.FailedTimesKeyString:
-			// do nothing
-		case constant.StatusKeyString:
-			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
-			if err != nil {
-				logger.Exception(err)
-				return nil, err
-			}
-			ep.status = Status(tmp)
-		case constant.HealthCheckKeyString:
-			if hc, err := GetHealthCheck(r.cli, id, constant.HealthCheckPrefixDefinition+id+constant.Slash); err != nil {
-				logger.Exception(err)
-				return nil, err
-			} else {
-				ep.healthCheck = hc
-			}
-		default:
-			logger.Errorf("unsupported service attribute: %s", keyStr)
-			return nil, errors.NewFormat(200, fmt.Sprintf("unsupported service attribute: %s", keyStr))
-		}
-	}
-	return ep, nil
 }
 
 func (r *Table) CreateEndpoint(id string, key string) error {
@@ -846,7 +791,7 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 							// service not found, do nothing
 							// waiting create_service func to connect this endpoint
 						} else {
-							if err := r.RefreshService(string(s.nameString), fmt.Sprintf("/Service/Service-%s/", s.nameString)); err != nil {
+							if err := r.RefreshService(s, fmt.Sprintf("/Service/Service-%s/", s.nameString)); err != nil {
 								logger.Exception(err)
 							}
 						}
@@ -864,21 +809,21 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 	return nil
 }
 
-func (r *Table) RefreshEndpoint(id string, key string) error {
+//not use in endpointTable
+func (r *Table) RefreshEndpointById(id string, key string) error {
+	oriEp, _ := r.GetEndpointById(id)
+	if oriEp == nil {
+		return r.CreateEndpoint(id, key)
+	}
+	return r.RefreshEndpoint(oriEp, key)
+}
+
+func (r *Table) RefreshEndpoint(oriEp *Endpoint, key string) error {
 	var newStatus Status
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
 		logger.Exception(err)
 		return err
-	}
-	tmp, err := r.GetEndpoint(id, key)
-	if err != nil {
-		logger.Exception(err)
-		return err
-	}
-	oriEp, ok := r.endpointTable.Load(tmp.nameString)
-	if !ok {
-		return r.CreateEndpoint(id, key)
 	}
 	ep := &Endpoint{}
 	for _, kv := range resp.Kvs {
@@ -891,9 +836,9 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 		switch keyStr {
 		case constant.IdKeyString:
 			// is forbidden to modify node id
-			if id != string(kv.Value) {
+			if oriEp.id != string(kv.Value) {
 				logger.Warningf("node key is not in accord with node id, node: %s", key)
-				ep.id = id
+				ep.id = oriEp.id
 			} else {
 				ep.id = string(kv.Value)
 			}
@@ -920,7 +865,7 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 			}
 			newStatus = Status(tmp)
 		case constant.HealthCheckKeyString:
-			if hc, err := RefreshHealthCheck(r.cli, id, constant.HealthCheckPrefixDefinition+id+constant.Slash); err != nil {
+			if hc, err := RefreshHealthCheck(r.cli, oriEp.id, constant.HealthCheckPrefixDefinition+oriEp.id+constant.Slash); err != nil {
 				logger.Exception(err)
 				return err
 			} else {
@@ -962,7 +907,7 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 			ori.id = ep.id
 			ori.status = ep.status
 
-			if err := r.RefreshService(string(value.nameString), fmt.Sprintf("/Service/Service-%s/", value.nameString)); err != nil {
+			if err := r.RefreshService(value, fmt.Sprintf("/Service/Service-%s/", value.nameString)); err != nil {
 				logger.Exception(err)
 			}
 		}
@@ -973,22 +918,19 @@ func (r *Table) RefreshEndpoint(id string, key string) error {
 
 func (r *Table) DeleteEndpoint(id string) error {
 	var err error
-	if ep, err := r.GetEndpointById(id); err != nil {
-		logger.Exception(err)
-		return err
-	} else {
+	if ep, exist := r.GetEndpointById(id); exist {
 		r.endpointTable.Delete(ep.nameString)
 		r.serviceTable.Range(func(key ServiceNameString, value *Service) bool {
 			if _, ok := value.ep.Load(ep.nameString); ok {
 				value.ep.Delete(ep.nameString)
-				if err = r.RefreshService(string(value.nameString), fmt.Sprintf("/Service/Service-%s/", value.nameString)); err != nil {
+				if err = r.RefreshService(value, fmt.Sprintf("/Service/Service-%s/", value.nameString)); err != nil {
 					logger.Exception(err)
 					return true
 				}
 			}
 			return false
 		})
-
+		logger.Debugf("endpoint delete finished: %s", id)
 	}
 	return err
 }
@@ -1008,7 +950,7 @@ func (r *Table) RefreshHealthCheck(id string, key string) error {
 			value.healthCheck.interval = hc.interval
 			value.healthCheck.timeout = hc.timeout
 
-			if err = r.RefreshEndpoint(value.id, fmt.Sprintf("/Node/Node-%s/", value.id)); err != nil {
+			if err = r.RefreshEndpoint(value, fmt.Sprintf("/Node/Node-%s/", value.id)); err != nil {
 				logger.Exception(err)
 			}
 			return true
