@@ -1,7 +1,8 @@
 package golang
 
 const (
-	RouterDefinitionPrefix = "/Router/"
+	RouterDefinitionPrefix  = "/Router/"
+	ServiceDefinitionPrefix = "/Service/"
 
 	NodeDefinition        = "/Node/Node-%s/"
 	ServiceDefinition     = "/Service/Service-%s/"
@@ -26,8 +27,10 @@ const (
 )
 
 var (
-	SlashBytes            = []byte("/")
-	RouterDefinitionBytes = []byte("/Router/")
-	RouterPrefixBytes     = []byte("Router-")
-	ServiceKeyBytes       = []byte("Service")
+	SlashBytes             = []byte("/")
+	RouterDefinitionBytes  = []byte("/Router/")
+	RouterPrefixBytes      = []byte("Router-")
+	ServiceDefinitionBytes = []byte("/Service/")
+	ServiceKeyBytes        = []byte("Service")
+	NodeKeyBytes           = []byte("Node")
 )

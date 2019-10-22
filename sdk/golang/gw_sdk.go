@@ -259,7 +259,62 @@ func (gw *ApiGatewayRegistrant) getAttr(key string) string {
 
 func (gw *ApiGatewayRegistrant) deleteOldNode() error {
 	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
-	return gw.deleteMany(nodeDefinition, clientv3.WithPrefix())
+	err := gw.deleteMany(nodeDefinition, clientv3.WithPrefix())
+	if err != nil {
+		logger.Exception(err)
+	}
+
+	hcDefinition := fmt.Sprintf(HealthCheckDefinition, gw.hc.ID)
+	err = gw.deleteMany(hcDefinition, clientv3.WithPrefix())
+	if err != nil {
+		logger.Exception(err)
+	}
+
+	//delete old node in exist services
+	resp, err := gw.getKeyValueWithPrefix(ServiceDefinitionPrefix)
+	if err != nil {
+		logger.Exception(err)
+		return err
+	}
+	kvs := make(map[string]interface{})
+	for _, kv := range resp.Kvs {
+		key := bytes.TrimPrefix(kv.Key, ServiceDefinitionBytes)
+		tmpSlice := bytes.Split(key, SlashBytes)
+		if len(tmpSlice) != 2 {
+			logger.Warningf("invalid router definition: %s", key)
+			continue
+		}
+		attr := tmpSlice[1]
+		if bytes.Equal(attr, NodeKeyBytes) {
+			var nodeSlice []string
+			err := json.Unmarshal(kv.Value, &nodeSlice)
+			if err != nil {
+				logger.Exception(err)
+				continue
+			}
+			s := mapset.NewSet()
+			for _, node := range nodeSlice {
+				s.Add(node)
+			}
+			if s.Contains(gw.node.ID) {
+				s.Remove(gw.node.ID)
+				nodeByteSlice, err := json.Marshal(s.ToSlice())
+				if err != nil {
+					logger.Exception(err)
+					continue
+				} else {
+					kvs[string(kv.Key)] = string(nodeByteSlice)
+				}
+			}
+		}
+	}
+	err = gw.putMany(kvs)
+	if err != nil {
+		logger.Exception(err)
+		return err
+	}
+
+	return err
 }
 
 func (gw *ApiGatewayRegistrant) registerNode() error {
