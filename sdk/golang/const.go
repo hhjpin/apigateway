@@ -31,6 +31,8 @@ var (
 	RouterDefinitionBytes  = []byte("/Router/")
 	RouterPrefixBytes      = []byte("Router-")
 	ServiceDefinitionBytes = []byte("/Service/")
-	ServiceKeyBytes        = []byte("Service")
-	NodeKeyBytes           = []byte("Node")
+	ServicePrefixBytes     = []byte("Service-")
+
+	ServiceKeyBytes = []byte("Service")
+	NodeKeyBytes    = []byte("Node")
 )

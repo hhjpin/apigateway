@@ -811,8 +811,8 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 
 //not use in endpointTable
 func (r *Table) RefreshEndpointById(id string, key string) error {
-	oriEp, _ := r.GetEndpointById(id)
-	if oriEp == nil {
+	oriEp, exist := r.GetEndpointById(id)
+	if !exist {
 		return r.CreateEndpoint(id, key)
 	}
 	return r.RefreshEndpoint(oriEp, key)

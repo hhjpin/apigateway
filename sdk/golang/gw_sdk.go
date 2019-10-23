@@ -182,6 +182,9 @@ func (gw *ApiGatewayRegistrant) putMany(kv interface{}, opts ...clientv3.OpOptio
 		logger.Error("wrong type of kv mapping")
 		return errors.New("wrong type of kv mapping")
 	}
+	if len(kvs) == 0 {
+		return nil
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	for k, v := range kvs {
@@ -257,18 +260,7 @@ func (gw *ApiGatewayRegistrant) getAttr(key string) string {
 	}
 }
 
-func (gw *ApiGatewayRegistrant) deleteOldNode() error {
-	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
-	err := gw.deleteMany(nodeDefinition, clientv3.WithPrefix())
-	if err != nil {
-		logger.Exception(err)
-	}
-
-	/*hcDefinition := fmt.Sprintf(HealthCheckDefinition, gw.hc.ID)
-	err = gw.deleteMany(hcDefinition, clientv3.WithPrefix())
-	if err != nil {
-		logger.Exception(err)
-	}*/
+func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
 
 	//delete old node in exist services
 	resp, err := gw.getKeyValueWithPrefix(ServiceDefinitionPrefix)
@@ -284,8 +276,9 @@ func (gw *ApiGatewayRegistrant) deleteOldNode() error {
 			logger.Warningf("invalid router definition: %s", key)
 			continue
 		}
+		sName := string(bytes.TrimPrefix(tmpSlice[0], ServicePrefixBytes))
 		attr := tmpSlice[1]
-		if bytes.Equal(attr, NodeKeyBytes) {
+		if bytes.Equal(attr, NodeKeyBytes) && gw.service.Name != sName {
 			var nodeSlice []string
 			err := json.Unmarshal(kv.Value, &nodeSlice)
 			if err != nil {
@@ -318,11 +311,6 @@ func (gw *ApiGatewayRegistrant) deleteOldNode() error {
 }
 
 func (gw *ApiGatewayRegistrant) registerNode() error {
-	if err := gw.deleteOldNode(); err != nil {
-		logger.Exception(err)
-		return err
-	}
-
 	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
 	resp, err := gw.getKeyValueWithPrefix(nodeDefinition)
 	if err != nil {
@@ -436,8 +424,10 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 }
 
 func (gw *ApiGatewayRegistrant) registerService() error {
-	var kvs map[string]interface{}
-	kvs = make(map[string]interface{})
+	if err := gw.deleteInvalidNodeInService(); err != nil {
+		logger.Exception(err)
+		return err
+	}
 
 	serviceDefinition := fmt.Sprintf(ServiceDefinition, gw.service.Name)
 	resp, err := gw.getKeyValueWithPrefix(serviceDefinition)
@@ -445,6 +435,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 		logger.Exception(err)
 		return err
 	}
+	kvs := make(map[string]interface{})
 	if resp.Count == 0 {
 		// service not existed
 		var nodes []string
