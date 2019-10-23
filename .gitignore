@@ -22,3 +22,5 @@ bin/
 api_gateway_v2
 go_tester
 go_client
+
+conf.yaml
