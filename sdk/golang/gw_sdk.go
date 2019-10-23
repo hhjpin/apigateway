@@ -264,11 +264,11 @@ func (gw *ApiGatewayRegistrant) deleteOldNode() error {
 		logger.Exception(err)
 	}
 
-	hcDefinition := fmt.Sprintf(HealthCheckDefinition, gw.hc.ID)
+	/*hcDefinition := fmt.Sprintf(HealthCheckDefinition, gw.hc.ID)
 	err = gw.deleteMany(hcDefinition, clientv3.WithPrefix())
 	if err != nil {
 		logger.Exception(err)
-	}
+	}*/
 
 	//delete old node in exist services
 	resp, err := gw.getKeyValueWithPrefix(ServiceDefinitionPrefix)
