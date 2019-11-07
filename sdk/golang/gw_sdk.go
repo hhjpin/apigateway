@@ -513,7 +513,7 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 		} else {
 			frontend = r.Method + "@/" + r.Frontend
 		}
-		if resp.Count == 0 {
+		if resp.Count != 6 {
 			kvs[routerName+IDKey] = r.ID
 			kvs[routerName+NameKey] = r.Name
 			kvs[routerName+StatusKey] = strconv.FormatUint(uint64(r.Status), 10)

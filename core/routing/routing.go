@@ -280,9 +280,16 @@ func (r *Table) SetRouterStatus(router *Router, status Status) (ok bool, err err
 	} else {
 		r.onlineTable.Delete(router.frontendApi)
 	}
-	if _, err := utils.PutKV(r.cli, router.key(constant.StatusKeyString), status.String()); err != nil {
+	resp, err := utils.GetKV(r.cli, router.key(constant.StatusKeyString))
+	if err != nil {
 		logger.Exception(err)
 		return false, err
+	}
+	if resp.Count > 0 {
+		if _, err := utils.PutKV(r.cli, router.key(constant.StatusKeyString), status.String()); err != nil {
+			logger.Exception(err)
+			return false, err
+		}
 	}
 	router.setStatus(status)
 	return true, nil
