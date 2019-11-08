@@ -512,9 +512,12 @@ func (r *Table) Select(input []byte, method []byte) (TargetServer, error) {
 		return TargetServer{}, errors.New(143)
 	}
 
-	ringLength := matchRouter.service.onlineEp.Len()
 	counts := 0
 	for {
+		counts++
+		if counts > matchRouter.service.onlineEp.Len() {
+			break
+		}
 		next := matchRouter.service.onlineEp.Value
 		matchRouter.service.onlineEp = matchRouter.service.onlineEp.Move(1)
 		_, ok := next.(EndpointNameString)
@@ -531,11 +534,6 @@ func (r *Table) Select(input []byte, method []byte) (TargetServer, error) {
 				uri:  replacedBackendUri,
 				svr:  matchRouter.service.name,
 			}, nil
-		}
-		ringLength = matchRouter.service.onlineEp.Len()
-		counts++
-		if counts > ringLength {
-			break
 		}
 	}
 	return TargetServer{}, errors.New(141)
