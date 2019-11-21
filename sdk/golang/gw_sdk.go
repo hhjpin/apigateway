@@ -498,10 +498,8 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 
 	for _, r := range gw.router {
 		var frontend string
-		var kvs map[string]interface{}
-		var ori map[string]interface{}
-		kvs = make(map[string]interface{})
-		ori = make(map[string]interface{})
+		var kvs = map[string]string{}
+		var ori = map[string]string{}
 		routerName := fmt.Sprintf(RouterDefinition, r.Name)
 		resp, err := gw.getKeyValueWithPrefix(routerName)
 		if err != nil {
@@ -533,22 +531,22 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 					if !bytes.Equal(kv.Value, []byte(r.Name)) {
 						kvs[routerName+NameKey] = r.Name
 					}
-					ori[routerName+NameKey] = kv.Value
+					ori[routerName+NameKey] = string(kv.Value)
 				} else if bytes.Equal(kv.Key, []byte(routerName+FrontendKey)) {
 					if !bytes.Equal(kv.Value, []byte(frontend)) {
 						kvs[routerName+FrontendKey] = frontend
 					}
-					ori[routerName+FrontendKey] = kv.Value
+					ori[routerName+FrontendKey] = string(kv.Value)
 				} else if bytes.Equal(kv.Key, []byte(routerName+BackendKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.Backend)) {
 						kvs[routerName+BackendKey] = r.Backend
 					}
-					ori[routerName+BackendKey] = kv.Value
+					ori[routerName+BackendKey] = string(kv.Value)
 				} else if bytes.Equal(kv.Key, []byte(routerName+ServiceKey)) {
 					if !bytes.Equal(kv.Value, []byte(r.Service.Name)) {
 						kvs[routerName+ServiceKey] = r.Service.Name
 					}
-					ori[routerName+ServiceKey] = kv.Value
+					ori[routerName+ServiceKey] = string(kv.Value)
 				} else {
 					logger.Warningf("unrecognized router key: %s", string(kv.Key))
 				}
@@ -556,8 +554,8 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 			if _, ok := kvs[routerName+FrontendKey]; ok {
 				if ori[routerName+FrontendKey] != kvs[routerName+FrontendKey] {
 					// just a new route, but have a duplicated name
-					logger.Debugf("original frontend key: %s; current frontend key: %s", string(ori[routerName+FrontendKey].([]byte)), string(kvs[routerName+FrontendKey].([]byte)))
-					logger.Warningf("router {%s} maybe a new router, please checkout", string(ori[routerName+NameKey].([]byte)))
+					logger.Debugf("original frontend key: %s; current frontend key: %s", ori[routerName+FrontendKey], kvs[routerName+FrontendKey])
+					logger.Warningf("router {%s} maybe a new router, please checkout", ori[routerName+NameKey])
 					os.Exit(-1)
 				}
 			}
