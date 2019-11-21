@@ -498,8 +498,8 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 
 	for _, r := range gw.router {
 		var frontend string
-		var kvs = map[string]string{}
-		var ori = map[string]string{}
+		var kvs = map[string]interface{}{}
+		var ori = map[string]interface{}{}
 		routerName := fmt.Sprintf(RouterDefinition, r.Name)
 		resp, err := gw.getKeyValueWithPrefix(routerName)
 		if err != nil {
