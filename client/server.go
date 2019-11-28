@@ -27,10 +27,11 @@ func Run(table *routing.Table) {
 
 	r := gin.New()
 	r.Use(Recovery(), LoggerWithWriter(os.Stdout), CrossDomain(), Auth(cf.Token), Table(table))
-	r.OPTIONS("/*any", func(c *gin.Context) {
+	r.OPTIONS(pre+"/api/v1/gw/*any", func(c *gin.Context) {
 		c.String(http.StatusOK, "")
 	})
-	r.GET(pre+"/summery", hander.Summery)
+	r.GET(pre+"/api/v1/gw/summery", hander.Summery)
+	r.GET(pre+"/api/v1/gw/client/register", hander.RegisterClient)
 
 	if err := r.Run(fmt.Sprintf("%s:%d", cf.ListenHost, cf.ListenPort)); err != nil {
 		logger.Exception(err)

@@ -79,7 +79,7 @@ DashBoard:
   ListenHost: "0.0.0.0"
   ListenPort: 8801
 
-  RoutePrefix: "/api/v1/gw"
+  RoutePrefix: ""
   #debug release test
   RequestModel: "debug"
 

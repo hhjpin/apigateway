@@ -637,6 +637,7 @@ func (r *Table) RefreshService(ori *Service, key string) error {
 	ori.acceptHttpMethod = svr.acceptHttpMethod
 	ori.ep = svr.ep
 	ori.onlineEp = svr.onlineEp
+	logger.Debugf("refresh service: %s", ori.nameString)
 
 	r.routerTable.Range(func(key RouterNameString, value *Router) {
 		if value.service.nameString == ori.nameString {
@@ -919,6 +920,7 @@ func (r *Table) RefreshEndpoint(oriEp *Endpoint, key string) error {
 func (r *Table) DeleteEndpoint(id string) error {
 	var err error
 	if ep, exist := r.GetEndpointById(id); exist {
+		logger.Debugf("endpoint delete begin: %s", id)
 		r.endpointTable.Delete(ep.nameString)
 		r.serviceTable.Range(func(key ServiceNameString, value *Service) bool {
 			if _, ok := value.ep.Load(ep.nameString); ok {

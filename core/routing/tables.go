@@ -2,6 +2,7 @@ package routing
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 type ApiRouterTableMap struct {
@@ -16,6 +17,7 @@ type OnlineApiRouterTableMap struct {
 
 type EndpointTableMap struct {
 	sync.RWMutex
+	readNum  int32
 	internal map[EndpointNameString]*Endpoint
 }
 
@@ -110,10 +112,22 @@ func NewEndpointTableMap() *EndpointTableMap {
 	}
 }
 
+func (m *EndpointTableMap) readLock() {
+	if atomic.AddInt32(&m.readNum, 1) == 1 {
+		m.RLock()
+	}
+}
+
+func (m *EndpointTableMap) readUnlock() {
+	if atomic.AddInt32(&m.readNum, -1) == 0 {
+		m.RUnlock()
+	}
+}
+
 func (m *EndpointTableMap) Load(key EndpointNameString) (value *Endpoint, ok bool) {
-	m.RLock()
+	m.readLock()
 	value, ok = m.internal[key]
-	m.RUnlock()
+	m.readUnlock()
 	return value, ok
 }
 
@@ -130,14 +144,14 @@ func (m *EndpointTableMap) Store(key EndpointNameString, value *Endpoint) {
 }
 
 func (m *EndpointTableMap) Range(f func(key EndpointNameString, value *Endpoint) bool) {
-	m.RLock()
+	m.readLock()
 	for k, v := range m.internal {
 		ok := f(k, v)
 		if ok {
 			break
 		}
 	}
-	m.RUnlock()
+	m.readUnlock()
 }
 
 func (m *EndpointTableMap) unsafeRange(f func(key EndpointNameString, value *Endpoint)) {
@@ -154,11 +168,11 @@ func (m *EndpointTableMap) Len() (length int) {
 }
 
 func (m *EndpointTableMap) equal(another *EndpointTableMap) (result bool) {
-	m.RLock()
-	another.RLock()
+	m.readLock()
+	another.readLock()
 	result = cmpMap(m.internal, another.internal)
-	another.RUnlock()
-	m.RUnlock()
+	another.readUnlock()
+	m.readUnlock()
 	return result
 }
 

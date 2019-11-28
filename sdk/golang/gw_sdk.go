@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/clientv3/concurrency"
 	"github.com/deckarep/golang-set"
 	"os"
 	"strconv"
@@ -53,6 +54,8 @@ type ApiGatewayRegistrant struct {
 	service *Service
 	hc      *HealthCheck
 	router  []*Router
+
+	mutex *EtcdMutex
 }
 
 var (
@@ -124,6 +127,7 @@ func NewApiGatewayRegistrant(cli *clientv3.Client, node *Node, service *Service,
 		service: service,
 		hc:      node.HC,
 		router:  router,
+		//mutex:   NewMutex(cli, "/global-lock"),
 	}
 }
 
@@ -170,42 +174,23 @@ func (gw *ApiGatewayRegistrant) putKeyValue(key, value string, opts ...clientv3.
 	return resp, err
 }
 
-func (gw *ApiGatewayRegistrant) putMany(kv interface{}, opts ...clientv3.OpOption) error {
+func (gw *ApiGatewayRegistrant) putMany(kvs map[string]string, opts ...clientv3.OpOption) error {
 	if gw.cli == nil {
 		logger.Error("etcd client need initialize")
 		return errors.New("etcd client need initialize")
 	}
 	cli := gw.cli
 
-	kvs, ok := kv.(map[string]interface{})
-	if !ok {
-		logger.Error("wrong type of kv mapping")
-		return errors.New("wrong type of kv mapping")
-	}
 	if len(kvs) == 0 {
 		return nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	for k, v := range kvs {
-		if sliceValue, ok := v.([]string); ok {
-			for _, item := range sliceValue {
-				_, err := cli.Put(ctx, k, item, opts...)
-				if err != nil {
-					cancel()
-					return err
-				}
-			}
-		} else if strValue, ok := v.(string); ok {
-			_, err := cli.Put(ctx, k, strValue, opts...)
-			if err != nil {
-				cancel()
-				return err
-			}
-		} else {
+		_, err := cli.Put(ctx, k, v, opts...)
+		if err != nil {
 			cancel()
-			logger.Errorf("wrong type of kv mapping value: %T", v)
-			return errors.New("wrong type of kv mapping value")
+			return err
 		}
 	}
 	cancel()
@@ -260,15 +245,15 @@ func (gw *ApiGatewayRegistrant) getAttr(key string) string {
 	}
 }
 
+//delete old node in exist services
 func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
-
-	//delete old node in exist services
 	resp, err := gw.getKeyValueWithPrefix(ServiceDefinitionPrefix)
 	if err != nil {
 		logger.Exception(err)
 		return err
 	}
-	kvs := make(map[string]interface{})
+	kvs := make(map[string]string)
+	dkvs := make([]string, 0)
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, ServiceDefinitionBytes)
 		tmpSlice := bytes.Split(key, SlashBytes)
@@ -278,7 +263,7 @@ func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
 		}
 		sName := string(bytes.TrimPrefix(tmpSlice[0], ServicePrefixBytes))
 		attr := tmpSlice[1]
-		if bytes.Equal(attr, NodeKeyBytes) && gw.service.Name != sName {
+		if bytes.Equal(attr, NodeKeyBytes) {
 			var nodeSlice []string
 			err := json.Unmarshal(kv.Value, &nodeSlice)
 			if err != nil {
@@ -289,36 +274,145 @@ func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
 			for _, node := range nodeSlice {
 				s.Add(node)
 			}
-			if s.Contains(gw.node.ID) {
-				s.Remove(gw.node.ID)
+			var isRemove = false
+			if gw.service.Name != sName {
+				if s.Contains(gw.node.ID) {
+					s.Remove(gw.node.ID)
+					isRemove = true
+					dkvs = append(dkvs, fmt.Sprintf(NodeDefinition, gw.node.ID))
+					dkvs = append(dkvs, fmt.Sprintf(HealthCheckDefinition, gw.node.ID))
+				}
+			} else {
+				for _, nodeId := range nodeSlice {
+					if nodeId == gw.node.ID {
+						continue
+					}
+					prefix := fmt.Sprintf(NodeDefinition, nodeId)
+					resp2, err := gw.getKeyValueWithPrefix(prefix)
+					if err != nil {
+						logger.Exception(err)
+						return err
+					}
+					var host string
+					var port int
+					for _, kv2 := range resp2.Kvs {
+						if string(kv2.Key) == prefix+HostKey {
+							host = string(kv2.Value)
+						} else if string(kv2.Key) == prefix+PortKey {
+							port, _ = strconv.Atoi(string(kv2.Value))
+						}
+					}
+					if host == gw.node.Host && port == gw.node.Port {
+						s.Remove(nodeId)
+						isRemove = true
+						dkvs = append(dkvs, fmt.Sprintf(NodeDefinition, nodeId))
+						dkvs = append(dkvs, fmt.Sprintf(HealthCheckDefinition, nodeId))
+					}
+				}
+			}
+			if isRemove {
 				nodeByteSlice, err := json.Marshal(s.ToSlice())
 				if err != nil {
 					logger.Exception(err)
 					continue
 				} else {
+					logger.Info("remove node in service: ", string(kv.Key), string(nodeByteSlice))
 					kvs[string(kv.Key)] = string(nodeByteSlice)
 				}
 			}
 		}
 	}
-	err = gw.putMany(kvs)
-	if err != nil {
-		logger.Exception(err)
-		return err
+	if len(kvs) > 0 {
+		err = gw.putMany(kvs)
+		if err != nil {
+			logger.Exception(err)
+			return err
+		}
+		logger.Info("delete invalid node: ", dkvs)
+		err = gw.deleteMany(dkvs, clientv3.WithPrefix())
+		if err != nil {
+			logger.Exception(err)
+			return err
+		}
 	}
 
 	return err
 }
 
 func (gw *ApiGatewayRegistrant) registerNode() error {
+	if err := gw.deleteInvalidNodeInService(); err != nil {
+		logger.Exception(err)
+		return err
+	}
+
+	hc := gw.hc
+	hcDefinition := fmt.Sprintf(HealthCheckDefinition, hc.ID)
+	resp, err := gw.getKeyValueWithPrefix(hcDefinition)
+	if err != nil {
+		logger.Exception(err)
+		return err
+	}
+	kvs := make(map[string]string)
+
+	if resp.Count == 0 {
+		kvs[hcDefinition+IDKey] = hc.ID
+		kvs[hcDefinition+PathKey] = hc.Path
+		kvs[hcDefinition+TimeoutKey] = strconv.FormatUint(uint64(hc.Timeout), 10)
+		kvs[hcDefinition+IntervalKey] = strconv.FormatUint(uint64(hc.Interval), 10)
+		if hc.Retry {
+			kvs[hcDefinition+RetryKey] = "1"
+		} else {
+			kvs[hcDefinition+RetryKey] = "0"
+		}
+		kvs[hcDefinition+RetryTimeKey] = strconv.FormatUint(uint64(hc.RetryTime), 10)
+	} else {
+		id := gw.getAttr(hcDefinition + IDKey)
+		path := gw.getAttr(hcDefinition + PathKey)
+		timeout := gw.getAttr(hcDefinition + TimeoutKey)
+		interval := gw.getAttr(hcDefinition + IntervalKey)
+		retry := gw.getAttr(hcDefinition + RetryKey)
+		retryTime := gw.getAttr(hcDefinition + RetryTimeKey)
+		if id != hc.ID {
+			kvs[hcDefinition+IDKey] = hc.ID
+		}
+		if path != hc.Path {
+			kvs[hcDefinition+PathKey] = hc.Path
+		}
+		if timeout != strconv.FormatInt(int64(hc.Timeout), 10) {
+			kvs[hcDefinition+TimeoutKey] = strconv.FormatInt(int64(hc.Timeout), 10)
+		}
+		if interval != strconv.FormatInt(int64(hc.Interval), 10) {
+			kvs[hcDefinition+IntervalKey] = strconv.FormatInt(int64(hc.Interval), 10)
+		}
+		tmp := "1"
+		if !hc.Retry {
+			tmp = "0"
+		}
+		if retry != tmp {
+			kvs[hcDefinition+RetryKey] = tmp
+		}
+		if retryTime != strconv.FormatInt(int64(hc.RetryTime), 10) {
+			kvs[hcDefinition+RetryTimeKey] = strconv.FormatInt(int64(hc.RetryTime), 10)
+		}
+		if len(kvs) > 0 {
+			logger.Infof("node keys waiting to be updated: %+v", kvs)
+		}
+	}
+
+	err = gw.putMany(kvs)
+	if err != nil {
+		logger.Exception(err)
+		return err
+	}
+
 	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
-	resp, err := gw.getKeyValueWithPrefix(nodeDefinition)
+	resp, err = gw.getKeyValueWithPrefix(nodeDefinition)
 	if err != nil {
 		logger.Exception(err)
 		return err
 	}
 	n := gw.node
-	kvs := make(map[string]interface{})
+	kvs = make(map[string]string)
 	if resp.Count == 0 {
 		kvs[nodeDefinition+IDKey] = n.ID
 		kvs[nodeDefinition+NameKey] = n.Name
@@ -360,82 +454,17 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 		return err
 	}
 
-	hc := gw.hc
-	hcDefinition := fmt.Sprintf(HealthCheckDefinition, hc.ID)
-	resp, err = gw.getKeyValueWithPrefix(hcDefinition)
-	if err != nil {
-		logger.Exception(err)
-		return err
-	}
-	kvs = make(map[string]interface{})
-
-	if resp.Count == 0 {
-		kvs[hcDefinition+IDKey] = hc.ID
-		kvs[hcDefinition+PathKey] = hc.Path
-		kvs[hcDefinition+TimeoutKey] = strconv.FormatUint(uint64(hc.Timeout), 10)
-		kvs[hcDefinition+IntervalKey] = strconv.FormatUint(uint64(hc.Interval), 10)
-		if hc.Retry {
-			kvs[hcDefinition+RetryKey] = "1"
-		} else {
-			kvs[hcDefinition+RetryKey] = "0"
-		}
-		kvs[hcDefinition+RetryTimeKey] = strconv.FormatUint(uint64(hc.RetryTime), 10)
-	} else {
-		id := gw.getAttr(hcDefinition + IDKey)
-		path := gw.getAttr(hcDefinition + PathKey)
-		timeout := gw.getAttr(hcDefinition + TimeoutKey)
-		interval := gw.getAttr(hcDefinition + IntervalKey)
-		retry := gw.getAttr(hcDefinition + RetryKey)
-		retryTime := gw.getAttr(hcDefinition + RetryTimeKey)
-		if id != hc.ID {
-			kvs[hcDefinition+IDKey] = hc.ID
-		}
-		if path != hc.Path {
-			kvs[hcDefinition+PathKey] = hc.Path
-		}
-		if timeout != strconv.FormatInt(int64(hc.Timeout), 10) {
-			kvs[hcDefinition+TimeoutKey] = hc.Timeout
-		}
-		if interval != strconv.FormatInt(int64(hc.Interval), 10) {
-			kvs[hcDefinition+IntervalKey] = hc.Interval
-		}
-		tmp := "1"
-		if !hc.Retry {
-			tmp = "0"
-		}
-		if retry != tmp {
-			kvs[hcDefinition+RetryKey] = tmp
-		}
-		if retryTime != strconv.FormatInt(int64(hc.RetryTime), 10) {
-			kvs[hcDefinition+RetryTimeKey] = hc.RetryTime
-		}
-		if len(kvs) > 0 {
-			logger.Infof("node keys waiting to be updated: %+v", kvs)
-		}
-	}
-
-	err = gw.putMany(kvs)
-	if err != nil {
-		logger.Exception(err)
-		return err
-	}
-
 	return nil
 }
 
 func (gw *ApiGatewayRegistrant) registerService() error {
-	if err := gw.deleteInvalidNodeInService(); err != nil {
-		logger.Exception(err)
-		return err
-	}
-
 	serviceDefinition := fmt.Sprintf(ServiceDefinition, gw.service.Name)
 	resp, err := gw.getKeyValueWithPrefix(serviceDefinition)
 	if err != nil {
 		logger.Exception(err)
 		return err
 	}
-	kvs := make(map[string]interface{})
+	kvs := make(map[string]string)
 	if resp.Count == 0 {
 		// service not existed
 		var nodes []string
@@ -498,8 +527,8 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 
 	for _, r := range gw.router {
 		var frontend string
-		var kvs = map[string]interface{}{}
-		var ori = map[string]interface{}{}
+		var kvs = map[string]string{}
+		var ori = map[string]string{}
 		routerName := fmt.Sprintf(RouterDefinition, r.Name)
 		resp, err := gw.getKeyValueWithPrefix(routerName)
 		if err != nil {
@@ -625,6 +654,9 @@ func (gw *ApiGatewayRegistrant) deleteInvalidRoutes() error {
 }
 
 func (gw *ApiGatewayRegistrant) Register() error {
+	/*if err := gw.mutex.Lock(); err != nil {
+		return err
+	}*/
 	if err := gw.registerNode(); err != nil {
 		logger.Exception(err)
 		return err
@@ -637,12 +669,14 @@ func (gw *ApiGatewayRegistrant) Register() error {
 		logger.Exception(err)
 		return err
 	}
+	/*if err := gw.mutex.Unlock(); err != nil {
+		return err
+	}*/
 	return nil
 }
 
 func (gw *ApiGatewayRegistrant) Unregister() error {
-	var kvs map[string]interface{}
-	kvs = make(map[string]interface{})
+	kvs := make(map[string]string)
 
 	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
 	resp, err := gw.getKeyValueWithPrefix(nodeDefinition)
@@ -661,5 +695,47 @@ func (gw *ApiGatewayRegistrant) Unregister() error {
 		logger.Exception(err)
 		return err
 	}
+	return nil
+}
+
+type EtcdMutex struct {
+	s *concurrency.Session
+	m *concurrency.Mutex
+}
+
+func NewMutex(client *clientv3.Client, key string) *EtcdMutex {
+	var err error
+	mutex := &EtcdMutex{}
+	mutex.s, err = concurrency.NewSession(client)
+	if err != nil {
+		logger.Error(err)
+		os.Exit(-1)
+		return mutex
+	}
+	mutex.m = concurrency.NewMutex(mutex.s, key)
+	return mutex
+}
+
+func (mutex *EtcdMutex) Lock() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second) //设置5s超时
+	defer cancel()
+	if err := mutex.m.Lock(ctx); err != nil {
+		logger.Error(err)
+		return err
+	}
+	logger.Info("+++++lock")
+	return nil
+}
+
+func (mutex *EtcdMutex) Unlock() error {
+	err := mutex.m.Unlock(context.TODO())
+	if err != nil {
+		return err
+	}
+	err = mutex.s.Close()
+	if err != nil {
+		return err
+	}
+	logger.Info("+++++unlock")
 	return nil
 }

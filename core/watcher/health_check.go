@@ -53,7 +53,7 @@ func (hc *HealthCheckWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 	hcId := tmp[0]
 	hcKey := hc.prefix + fmt.Sprintf(constant.HealthCheckPrefixString, hcId)
-	logger.Debugf("新的HealthCheck写入事件, id: %s, key: %s", hcId, hcKey)
+	logger.Debugf("新的HealthCheck写入事件, key: %s, val: %s", string(kv.Key), string(kv.Value))
 
 	if isCreate {
 		if ok, err := validKV(hc.cli, hcKey, hc.attrs, false); err != nil || !ok {
@@ -82,9 +82,7 @@ func (hc *HealthCheckWatcher) Delete(kv *mvccpb.KeyValue) error {
 		logger.Warningf("invalid healthCheck key: %s", string(kv.Key))
 		return errors.NewFormat(200, fmt.Sprintf("invalid healthCheck key: %s", string(kv.Key)))
 	}
-	hcId := tmp[0]
-	hcKey := hc.prefix + fmt.Sprintf(constant.HealthCheckPrefixString, hcId)
-	logger.Debugf("新的HealthCheck删除事件, id: %s, key: %s", hcId, hcKey)
+	logger.Debugf("新的HealthCheck删除事件, key: %s", string(kv.Key))
 
 	logger.Infof("HealthCheck delete event will not delete healthCheck object")
 	return nil
