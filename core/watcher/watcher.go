@@ -10,8 +10,8 @@ import (
 )
 
 type Watcher interface {
-	Put(kv *mvccpb.KeyValue, isCreate bool) error
-	Delete(kv *mvccpb.KeyValue) error
+	Put(key, val string, isCreate bool) error
+	Delete(key string) error
 	BindTable(table *routing.Table)
 	GetTable() *routing.Table
 	GetWatchChan() clientv3.WatchChan
@@ -48,19 +48,36 @@ func watch(w Watcher, c clientv3.WatchChan) {
 				Mapping[w] = c
 				goto Over
 			}
+			table := w.GetTable()
 			if len(resp.Events) > 0 {
 				for _, evt := range resp.Events {
 					switch evt.Type {
 					case mvccpb.PUT:
-						if err := w.Put(evt.Kv, evt.IsCreate()); err != nil {
-							logger.Exception(err)
-						}
+						table.PushWatchEvent(routing.WatchMsg{
+							Handle: func() routing.WatchMsgFunc {
+								key := string(evt.Kv.Key)
+								value := string(evt.Kv.Value)
+								return func() {
+									if err := w.Put(key, value, evt.IsCreate()); err != nil {
+										logger.Exception(err)
+									}
+								}
+							}(),
+						})
 					case mvccpb.DELETE:
-						if err := w.Delete(evt.Kv); err != nil {
-							logger.Exception(err)
-						}
+						table.PushWatchEvent(routing.WatchMsg{
+							Handle: func() routing.WatchMsgFunc {
+								key := string(evt.Kv.Key)
+								return func() {
+									if err := w.Delete(key); err != nil {
+										logger.Exception(err)
+									}
+								}
+							}(),
+						})
 					default:
 						logger.Warningf("unrecognized event type: %d", evt.Type)
+						continue
 					}
 				}
 			}

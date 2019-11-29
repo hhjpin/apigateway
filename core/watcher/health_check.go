@@ -7,7 +7,6 @@ import (
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/mvcc/mvccpb"
 	"strings"
 )
 
@@ -44,16 +43,16 @@ func (hc *HealthCheckWatcher) Refresh() {
 	hc.WatchChan = hc.cli.Watch(hc.ctx, hc.prefix, clientv3.WithPrefix())
 }
 
-func (hc *HealthCheckWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
-	healthCheck := strings.TrimPrefix(string(kv.Key), hc.prefix+"HC-")
+func (hc *HealthCheckWatcher) Put(key, val string, isCreate bool) error {
+	healthCheck := strings.TrimPrefix(key, hc.prefix+"HC-")
 	tmp := strings.Split(healthCheck, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid healthCheck key: %s", string(kv.Key))
-		return errors.NewFormat(200, fmt.Sprintf("invalid healthCheck key: %s", string(kv.Key)))
+		logger.Warningf("invalid healthCheck key: %s", key)
+		return errors.NewFormat(200, fmt.Sprintf("invalid healthCheck key: %s", key))
 	}
 	hcId := tmp[0]
 	hcKey := hc.prefix + fmt.Sprintf(constant.HealthCheckPrefixString, hcId)
-	logger.Debugf("新的HealthCheck写入事件, key: %s, val: %s", string(kv.Key), string(kv.Value))
+	logger.Debugf("[ETCD PUT] HealthCheck, key: %s, val: %s, new: %t", key, val, isCreate)
 
 	if isCreate {
 		if ok, err := validKV(hc.cli, hcKey, hc.attrs, false); err != nil || !ok {
@@ -75,14 +74,14 @@ func (hc *HealthCheckWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 }
 
-func (hc *HealthCheckWatcher) Delete(kv *mvccpb.KeyValue) error {
-	healthCheck := strings.TrimPrefix(string(kv.Key), hc.prefix+"HC-")
+func (hc *HealthCheckWatcher) Delete(key string) error {
+	healthCheck := strings.TrimPrefix(key, hc.prefix+"HC-")
 	tmp := strings.Split(healthCheck, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid healthCheck key: %s", string(kv.Key))
-		return errors.NewFormat(200, fmt.Sprintf("invalid healthCheck key: %s", string(kv.Key)))
+		logger.Warningf("invalid healthCheck key: %s", key)
+		return errors.NewFormat(200, fmt.Sprintf("invalid healthCheck key: %s", key))
 	}
-	logger.Debugf("新的HealthCheck删除事件, key: %s", string(kv.Key))
+	logger.Debugf("[ETCD DELETE] HealthCheck, key: %s", key)
 
 	logger.Infof("HealthCheck delete event will not delete healthCheck object")
 	return nil

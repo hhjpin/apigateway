@@ -18,6 +18,7 @@ func InitRoutingTable(cli *clientv3.Client) *Table {
 
 	rt.cli = cli
 	rt.Version = "1.0.0"
+	rt.events = NewEvents()
 	ol := NewOnlineRouteTableMap()
 	svrMap, epMap, err := initServiceNode(cli)
 	if err != nil {

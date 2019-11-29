@@ -6,7 +6,6 @@ import (
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/mvcc/mvccpb"
 	"strings"
 )
 
@@ -43,16 +42,16 @@ func (r *RouteWatcher) Refresh() {
 	r.WatchChan = r.cli.Watch(r.ctx, r.prefix, clientv3.WithPrefix())
 }
 
-func (r *RouteWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
-	route := strings.TrimPrefix(string(kv.Key), r.prefix+"Router-")
+func (r *RouteWatcher) Put(key, val string, isCreate bool) error {
+	route := strings.TrimPrefix(key, r.prefix+"Router-")
 	tmp := strings.Split(route, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid router key: %s", string(kv.Key))
-		return errors.NewFormat(200, fmt.Sprintf("invalid router key: %s", string(kv.Key)))
+		logger.Warningf("invalid router key: %s", key)
+		return errors.NewFormat(200, fmt.Sprintf("invalid router key: %s", key))
 	}
 	routeName := tmp[0]
 	routeKey := r.prefix + fmt.Sprintf("Router-%s/", routeName)
-	logger.Debugf("新的Router写入事件, key: %s, val: %s", string(kv.Key), string(kv.Value))
+	logger.Debugf("[ETCD PUT] Router, key: %s, val: %s, new: %t", key, val, isCreate)
 	if isCreate {
 		if ok, err := validKV(r.cli, routeKey, r.attrs, false); err != nil || !ok {
 			logger.Warningf("new route lack attribute, it may not have been created yet. Suggest to wait")
@@ -73,16 +72,16 @@ func (r *RouteWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 }
 
-func (r *RouteWatcher) Delete(kv *mvccpb.KeyValue) error {
-	route := strings.TrimPrefix(string(kv.Key), r.prefix+"Router-")
+func (r *RouteWatcher) Delete(key string) error {
+	route := strings.TrimPrefix(key, r.prefix+"Router-")
 	tmp := strings.Split(route, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid router key: %s", string(kv.Key))
-		return errors.NewFormat(200, fmt.Sprintf("invalid router key: %s", string(kv.Key)))
+		logger.Warningf("invalid router key: %s", key)
+		return errors.NewFormat(200, fmt.Sprintf("invalid router key: %s", key))
 	}
 	routeName := tmp[0]
 	//routeKey := r.prefix + fmt.Sprintf("Router-%s/", routeName)
-	logger.Debugf("新的Router删除事件, name: %s, key: %s", routeName, string(kv.Key))
+	logger.Debugf("新的Router删除事件, name: %s, key: %s", routeName, key)
 
 	//if ok, err := validKV(r.cli, routeKey, r.attrs, true); err != nil || !ok {
 	//	logger.Warningf("route attribute still exists, it may not have been deleted yet. Suggest to wait")

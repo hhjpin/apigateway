@@ -95,8 +95,9 @@ func init() {
 	watcher.Mapping[serviceWatcher] = serviceWatcher.WatchChan
 	watcher.Mapping[endpointWatcher] = endpointWatcher.WatchChan
 	watcher.Mapping[healthCheckWatcher] = healthCheckWatcher.WatchChan
-	go table.HealthCheck()
 	go watcher.Watch(watcher.Mapping)
+	go table.HealthCheck()
+	go table.HandleEvent()
 	go client.Run(table)
 }
 

@@ -1,14 +1,12 @@
 package watcher
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/mvcc/mvccpb"
 	"strings"
 )
 
@@ -45,20 +43,20 @@ func (ep *EndpointWatcher) Refresh() {
 	ep.WatchChan = ep.cli.Watch(ep.ctx, ep.prefix, clientv3.WithPrefix())
 }
 
-func (ep *EndpointWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
-	endpoint := strings.TrimPrefix(string(kv.Key), ep.prefix+"Node-")
+func (ep *EndpointWatcher) Put(key, val string, isCreate bool) error {
+	endpoint := strings.TrimPrefix(key, ep.prefix+"Node-")
 	tmp := strings.Split(endpoint, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid endpoint key: %s", string(kv.Key))
-		return errors.NewFormat(200, fmt.Sprintf("invalid endpoint key: %s", string(kv.Key)))
+		logger.Warningf("invalid endpoint key: %s", key)
+		return errors.NewFormat(200, fmt.Sprintf("invalid endpoint key: %s", key))
 	}
 	endpointId := tmp[0]
 	endpointKey := ep.prefix + fmt.Sprintf("Node-%s/", endpointId)
-	if bytes.Equal(kv.Key, []byte(endpointKey+constant.FailedTimesKeyString)) {
+	if key == endpointKey+constant.FailedTimesKeyString {
 		// ignore failed times key put event
 		return nil
 	}
-	logger.Debugf("新的Endpoint写入事件, key: %s, value: %s", string(kv.Key), string(kv.Value))
+	logger.Debugf("[ETCD PUT] Endpoint, key: %s, value: %s, new: %t", key, val, isCreate)
 	if isCreate {
 		if ok, err := validKV(ep.cli, endpointKey, ep.attrs, false); err != nil || !ok {
 			logger.Warningf("new endpoint lack attribute, it may not have been created yet. Suggest to wait")
@@ -79,16 +77,16 @@ func (ep *EndpointWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 }
 
-func (ep *EndpointWatcher) Delete(kv *mvccpb.KeyValue) error {
-	endpoint := strings.TrimPrefix(string(kv.Key), ep.prefix+"Node-")
+func (ep *EndpointWatcher) Delete(key string) error {
+	endpoint := strings.TrimPrefix(key, ep.prefix+"Node-")
 	tmp := strings.Split(endpoint, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid endpoint key: %s", string(kv.Key))
-		return errors.NewFormat(200, fmt.Sprintf("invalid endpoint key: %s", string(kv.Key)))
+		logger.Warningf("invalid endpoint key: %s", key)
+		return errors.NewFormat(200, fmt.Sprintf("invalid endpoint key: %s", key))
 	}
 	endpointId := tmp[0]
 	//endpointKey := ep.prefix + fmt.Sprintf("Node-%s/", endpointId)
-	logger.Debugf("新的Endpoint删除事件, id: %s, key: %s", endpointId, kv.Key)
+	logger.Debugf("[ETCD DELETE] Endpoint key: %s", key)
 
 	/*if ok, err := validKV(ep.cli, endpointKey, ep.attrs, true); err != nil || !ok {
 		logger.Warningf("endpoint attribute still exists, it may not have been deleted yet. Suggest to wait")

@@ -7,7 +7,6 @@ import (
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/mvcc/mvccpb"
 	"strings"
 )
 
@@ -52,16 +51,16 @@ func (s *ServiceWatcher) GetTable() *routing.Table {
 	return s.table
 }
 
-func (s *ServiceWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
-	svr := strings.TrimPrefix(string(kv.Key), s.prefix+"Service-")
+func (s *ServiceWatcher) Put(key, val string, isCreate bool) error {
+	svr := strings.TrimPrefix(key, s.prefix+"Service-")
 	tmp := strings.Split(svr, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid service key: %s", string(kv.Key))
-		return errors.NewFormat(200, fmt.Sprintf("invalid service key: %s", string(kv.Key)))
+		logger.Warningf("invalid service key: %s", key)
+		return errors.NewFormat(200, fmt.Sprintf("invalid service key: %s", key))
 	}
 	svrName := tmp[0]
 	svrKey := s.prefix + fmt.Sprintf(constant.ServicePrefixString, svrName)
-	logger.Debugf("新的Service写入事件, key: %s, value: %s", string(kv.Key), string(kv.Value))
+	logger.Debugf("[ETCD PUT] Service, key: %s, value: %s, new: %t", key, val, isCreate)
 	if isCreate {
 		if ok, err := validKV(s.cli, svrKey, s.attrs, false); err != nil || !ok {
 			logger.Warningf("new service lack attribute, it may not have been created yet. Suggest to wait")
@@ -82,12 +81,12 @@ func (s *ServiceWatcher) Put(kv *mvccpb.KeyValue, isCreate bool) error {
 	}
 }
 
-func (s *ServiceWatcher) Delete(kv *mvccpb.KeyValue) error {
-	svr := strings.TrimPrefix(string(kv.Key), s.prefix+"Service-")
+func (s *ServiceWatcher) Delete(key string) error {
+	svr := strings.TrimPrefix(key, s.prefix+"Service-")
 	tmp := strings.Split(svr, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid service key: %s", string(kv.Key))
-		return errors.NewFormat(200, fmt.Sprintf("invalid service key: %s", string(kv.Key)))
+		logger.Warningf("invalid service key: %s", key)
+		return errors.NewFormat(200, fmt.Sprintf("invalid service key: %s", key))
 	}
 	svrName := tmp[0]
 	svrKey := s.prefix + fmt.Sprintf(constant.ServicePrefixString, svrName)
