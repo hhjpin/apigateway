@@ -8,7 +8,6 @@ import (
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/valyala/fasthttp"
 	"strconv"
-	"time"
 )
 
 type HealthCheck struct {
@@ -117,20 +116,4 @@ func (r *Table) doHealthCheck() {
 			}
 		}
 	})
-}
-
-func (r *Table) HealthCheck() {
-	defer func() {
-		logger.Debugf("health check panic")
-		if err := recover(); err != nil {
-			stack := utils.Stack(3)
-			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", utils.TimeFormat(time.Now()), err, stack)
-		}
-		go r.HealthCheck()
-	}()
-	for {
-		r.PushHealthCheckEvent()
-
-		time.Sleep(time.Second * 10)
-	}
 }

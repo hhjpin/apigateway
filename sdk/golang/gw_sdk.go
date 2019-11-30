@@ -684,9 +684,7 @@ func (gw *ApiGatewayRegistrant) Unregister() error {
 		logger.Exception(err)
 		return err
 	}
-	if resp.Count == 0 {
-		kvs[nodeDefinition+StatusKey] = strconv.FormatUint(uint64(2), 10)
-	} else {
+	if resp.Count != 0 {
 		kvs[nodeDefinition+StatusKey] = "2"
 	}
 

@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-type HealthCheckMsg int
-
 type WatchMsgFunc func()
 
 type WatchMsg struct {
@@ -14,19 +12,13 @@ type WatchMsg struct {
 }
 
 type Events struct {
-	watchCh       chan WatchMsg
-	healthCheckCh chan HealthCheckMsg
+	watchCh chan WatchMsg
 }
 
 func NewEvents() *Events {
 	return &Events{
-		healthCheckCh: make(chan HealthCheckMsg),
-		watchCh:       make(chan WatchMsg, 1000),
+		watchCh: make(chan WatchMsg, 1000),
 	}
-}
-
-func (r *Table) PushHealthCheckEvent() {
-	r.events.healthCheckCh <- 1
 }
 
 func (r *Table) PushWatchEvent(msg WatchMsg) {
@@ -43,10 +35,13 @@ func (r *Table) HandleEvent() {
 		go r.HandleEvent()
 	}()
 
+	hcInterval := time.Second * 10
+	timer := time.NewTimer(hcInterval)
 	for {
 		select {
-		case <-r.events.healthCheckCh:
+		case <-timer.C:
 			r.doHealthCheck()
+			timer.Reset(hcInterval)
 		case msg := <-r.events.watchCh:
 			r.handleWatchEvent(&msg)
 		}

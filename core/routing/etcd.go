@@ -1026,69 +1026,6 @@ func CreateHealthCheck(cli *clientv3.Client, id string, key string) (*HealthChec
 	return hc, nil
 }
 
-func GetHealthCheck(cli *clientv3.Client, id string, key string) (*HealthCheck, error) {
-	resp, err := utils.GetPrefixKV(cli, key, clientv3.WithPrefix())
-	if err != nil {
-		logger.Exception(err)
-		return nil, err
-	}
-	hc := &HealthCheck{}
-	for _, kv := range resp.Kvs {
-		key := bytes.TrimPrefix(kv.Key, []byte(key))
-		if bytes.Contains(key, constant.SlashBytes) {
-			logger.Warningf("invalid health-check attribute key")
-			return nil, errors.NewFormat(200, "invalid health-check attribute key")
-		}
-		keyStr := string(key)
-		switch keyStr {
-		case constant.IdKeyString:
-			// is forbidden to modify health-check id
-			if id != string(kv.Value) {
-				logger.Warningf("node key is not in accord with node id, node: %s", key)
-				hc.id = id
-			} else {
-				hc.id = string(kv.Value)
-			}
-		case constant.PathKeyString:
-			hc.path = kv.Value
-		case constant.IntervalKeyString:
-			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
-			if err != nil {
-				logger.Exception(err)
-				return nil, err
-			}
-			hc.interval = uint8(tmp)
-		case constant.RetryKeyString:
-			if string(kv.Value) == "0" {
-				hc.retry = false
-			} else if string(kv.Value) == "1" {
-				hc.retry = true
-			} else {
-				logger.Warningf("unrecognized retry value: %+v", string(kv.Value))
-				hc.retry = false
-			}
-		case constant.RetryTimeKeyString:
-			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
-			if err != nil {
-				logger.Exception(err)
-				return nil, err
-			}
-			hc.retryTime = uint8(tmp)
-		case constant.TimeoutKeyString:
-			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
-			if err != nil {
-				logger.Exception(err)
-				return nil, err
-			}
-			hc.timeout = uint8(tmp)
-		default:
-			logger.Errorf("unsupported health-check attribute: %s", keyStr)
-			return nil, errors.NewFormat(200, fmt.Sprintf("unsupported health-check attribute: %s", keyStr))
-		}
-	}
-	return hc, nil
-}
-
 func RefreshHealthCheck(cli *clientv3.Client, id string, key string) (*HealthCheck, error) {
 	resp, err := utils.GetPrefixKV(cli, key, clientv3.WithPrefix())
 	if err != nil {
