@@ -24,7 +24,7 @@ import (
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
 	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/golang/time/rate"
+	"golang.org/x/time/rate"
 	"strconv"
 )
 
