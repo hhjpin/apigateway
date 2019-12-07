@@ -130,6 +130,10 @@ func (s Status) String() string {
 	return strconv.FormatInt(int64(s), 10)
 }
 
+func (r *Table) GetEtcdClient() *clientv3.Client {
+	return r.cli
+}
+
 func (r *Table) addBackendEndpoint(ep *Endpoint) (ok bool, err error) {
 
 	_, exists := r.endpointTable.Load(ep.nameString)

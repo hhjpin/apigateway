@@ -31,7 +31,7 @@ func Run(table *routing.Table) {
 		c.String(http.StatusOK, "")
 	})
 	r.GET(pre+"/api/v1/gw/summery", hander.Summery)
-	//r.GET(pre+"/api/v1/gw/client/register", hander.RegisterClient)
+	r.POST(pre+"/api/v1/gw/client/register", hander.RegisterClient)
 
 	if err := r.Run(fmt.Sprintf("%s:%d", cf.ListenHost, cf.ListenPort)); err != nil {
 		logger.Exception(err)

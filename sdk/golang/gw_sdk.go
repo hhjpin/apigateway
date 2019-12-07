@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/clientv3/concurrency"
 	"github.com/deckarep/golang-set"
 	"os"
 	"strconv"
@@ -54,8 +53,6 @@ type ApiGatewayRegistrant struct {
 	service *Service
 	hc      *HealthCheck
 	router  []*Router
-
-	mutex *EtcdMutex
 }
 
 var (
@@ -73,15 +70,7 @@ func NewHealthCheck(path string, timeout, interval, retryTime uint8, retry bool)
 }
 
 func NewNode(host string, port int, hc *HealthCheck) *Node {
-	var uid string
-
-	hardwareAddr := GetHardwareAddressAsLong()
-	if len(hardwareAddr) > 0 {
-		// use hardware address of first interface
-		uid = strconv.FormatInt(hardwareAddr[0], 10) + ":" + strconv.FormatInt(int64(port), 10)
-	} else {
-		logger.Error("can not gain local hardware address")
-	}
+	uid := fmt.Sprintf("%s-%d", host, port)
 	hc.ID = uid
 	return &Node{
 		ID:     uid,
@@ -127,7 +116,6 @@ func NewApiGatewayRegistrant(cli *clientv3.Client, node *Node, service *Service,
 		service: service,
 		hc:      node.HC,
 		router:  router,
-		//mutex:   NewMutex(cli, "/global-lock"),
 	}
 }
 
@@ -654,9 +642,6 @@ func (gw *ApiGatewayRegistrant) deleteInvalidRoutes() error {
 }
 
 func (gw *ApiGatewayRegistrant) Register() error {
-	/*if err := gw.mutex.Lock(); err != nil {
-		return err
-	}*/
 	if err := gw.registerNode(); err != nil {
 		logger.Exception(err)
 		return err
@@ -669,9 +654,6 @@ func (gw *ApiGatewayRegistrant) Register() error {
 		logger.Exception(err)
 		return err
 	}
-	/*if err := gw.mutex.Unlock(); err != nil {
-		return err
-	}*/
 	return nil
 }
 
@@ -693,47 +675,5 @@ func (gw *ApiGatewayRegistrant) Unregister() error {
 		logger.Exception(err)
 		return err
 	}
-	return nil
-}
-
-type EtcdMutex struct {
-	s *concurrency.Session
-	m *concurrency.Mutex
-}
-
-func NewMutex(client *clientv3.Client, key string) *EtcdMutex {
-	var err error
-	mutex := &EtcdMutex{}
-	mutex.s, err = concurrency.NewSession(client)
-	if err != nil {
-		logger.Error(err)
-		os.Exit(-1)
-		return mutex
-	}
-	mutex.m = concurrency.NewMutex(mutex.s, key)
-	return mutex
-}
-
-func (mutex *EtcdMutex) Lock() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second) //设置5s超时
-	defer cancel()
-	if err := mutex.m.Lock(ctx); err != nil {
-		logger.Error(err)
-		return err
-	}
-	logger.Info("+++++lock")
-	return nil
-}
-
-func (mutex *EtcdMutex) Unlock() error {
-	err := mutex.m.Unlock(context.TODO())
-	if err != nil {
-		return err
-	}
-	err = mutex.s.Close()
-	if err != nil {
-		return err
-	}
-	logger.Info("+++++unlock")
 	return nil
 }
