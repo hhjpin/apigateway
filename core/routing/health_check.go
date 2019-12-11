@@ -58,7 +58,7 @@ func (r *Table) doHealthCheck() {
 	r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) bool {
 		var status Status
 		if value.status == Offline {
-			logger.Warnf("EndPoint [%s] OFFLINE, skip health check", value.nameString)
+			logger.Infof("EndPoint [%s] OFFLINE, skip health check", value.nameString)
 			return false
 		}
 		resp, err := utils.GetKV(r.cli, value.key(constant.StatusKeyString))
