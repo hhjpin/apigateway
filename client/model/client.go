@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/sdk/golang"
-	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 )
 
 type ClientModel struct {
@@ -46,7 +47,7 @@ func (c *ClientModel) newRoutes(routes []RouteItem, svr *golang.Service) ([]*gol
 	for _, rt := range routes {
 		if rt.Method == "" || rt.Frontend == "" || rt.Backend == "" {
 			err := errors.NewFormat(9, fmt.Sprintf("route is error: %#v", rt))
-			logger.Exception(err)
+			logger.Error(err)
 			return nil, err
 		}
 		name := bytes.Trim([]byte(rt.Frontend), "/")

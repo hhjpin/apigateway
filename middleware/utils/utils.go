@@ -3,17 +3,13 @@ package utils
 import (
 	"bytes"
 	"fmt"
-	"git.henghajiang.com/backend/golang_utils/log"
+	"github.com/hhjpin/goutils/logger"
 	"io/ioutil"
-	"os"
 	"runtime"
-	"strconv"
 	"time"
 )
 
 var (
-	logger = log.Logger
-
 	dunno     = []byte("???")
 	centerDot = []byte("·")
 	dot       = []byte(".")
@@ -61,7 +57,7 @@ func Stack(skip int) []byte {
 		}
 
 		if _, err := fmt.Fprintf(buf, "%s:%d (0x%x)\n", file, line, pc); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 		}
 		if file != lastFile {
 			data, err := ioutil.ReadFile(file)
@@ -72,26 +68,8 @@ func Stack(skip int) []byte {
 			lastFile = file
 		}
 		if _, err := fmt.Fprintf(buf, "\t%s: %s\n", function(pc), source(lines, line)); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 		}
 	}
 	return buf.Bytes()
-}
-
-func init() {
-	serverDebug := os.Getenv("SERVER_DEBUG")
-	logger.DisableDebug()
-	if serverDebug != "" {
-		tmp, err := strconv.ParseInt(serverDebug, 10, 64)
-		if err != nil {
-			logger.Exception(err)
-		}
-		if tmp > 0 {
-			logger.EnableDebug()
-		} else {
-			logger.DisableDebug()
-		}
-	} else {
-		logger.EnableDebug()
-	}
 }

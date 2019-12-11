@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
-	"git.henghajiang.com/backend/golang_utils/errors"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 	"github.com/valyala/fasthttp"
 	"time"
 )
@@ -99,7 +100,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	//	timer := time.NewTimer(5 * time.Second)
 	//	select {
 	//	case <-timer.C:
-	//		logger.Warning("Counting channel maybe full")
+	//		logger.Warn("Counting channel maybe full")
 	//	case middleware.CountingCh[hashed] <- counting:
 	//		// pass
 	//	}
@@ -123,7 +124,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 
 	target, err := rt.Select(ctx.Path(), ctx.Method())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		if e, ok := err.(errors.Error); ok {
 			if e.ErrCode == 142 {
 				ctx.Error(string(e.MarshalEmptyData()), fasthttp.StatusNotFound)
@@ -163,7 +164,7 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	revReq.Header.SetMethodBytes(ctx.Request.Header.Method())
 	err = fasthttp.Do(revReq, revRes)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		ctx.Error("Internal Server Error", fasthttp.StatusInternalServerError)
 		return
 	}

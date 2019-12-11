@@ -22,8 +22,9 @@ import (
 	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/core/utils"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
-	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 	"golang.org/x/time/rate"
 	"strconv"
 )
@@ -165,7 +166,7 @@ func (r *Table) endpointSliceExists(ep []*Endpoint) (rest []*Endpoint) {
 func (r *Table) GetRouterByName(name []byte) (*Router, error) {
 	router, exists := r.routerTable.Load(RouterNameString(name))
 	if !exists {
-		logger.Warningf("can not find router by name: %s", RouterNameString(name))
+		logger.Warnf("can not find router by name: %s", RouterNameString(name))
 		return nil, errors.New(131)
 	}
 	return router, nil
@@ -174,7 +175,7 @@ func (r *Table) GetRouterByName(name []byte) (*Router, error) {
 func (r *Table) GetServiceByName(name []byte) (*Service, error) {
 	svr, exists := r.serviceTable.Load(ServiceNameString(name))
 	if !exists {
-		logger.Warningf("can not find service by name: %s", ServiceNameString(name))
+		logger.Warnf("can not find service by name: %s", ServiceNameString(name))
 		return nil, errors.New(137)
 	}
 	return svr, nil
@@ -183,7 +184,7 @@ func (r *Table) GetServiceByName(name []byte) (*Service, error) {
 func (r *Table) GetEndpointByName(name []byte) (*Endpoint, error) {
 	ep, exists := r.endpointTable.Load(EndpointNameString(name))
 	if !exists {
-		logger.Warningf("can not find endpoint by name: %s", EndpointNameString(name))
+		logger.Warnf("can not find endpoint by name: %s", EndpointNameString(name))
 		return nil, errors.New(139)
 	}
 	return ep, nil
@@ -208,7 +209,7 @@ func (r *Table) RemoveRouter(router *Router) (ok bool, err error) {
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
-		logger.Warning("router not exists")
+		logger.Warn("router not exists")
 		return false, errors.New(125)
 	}
 
@@ -226,7 +227,7 @@ func (r *Table) SetRouterOnline(router *Router) (ok bool, err error) {
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
-		logger.Warning("router not exists")
+		logger.Warn("router not exists")
 		return false, errors.New(125)
 	}
 
@@ -252,7 +253,7 @@ func (r *Table) SetRouterOnline(router *Router) (ok bool, err error) {
 				}
 			}
 			if _, err := utils.PutKV(r.cli, router.key(constant.StatusKeyString), Online.String()); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return false, err
 			}
 			router.setStatus(Online)
@@ -277,7 +278,7 @@ func (r *Table) SetRouterStatus(router *Router, status Status) (ok bool, err err
 
 	_, exists := r.table.Load(router.frontendApi.pathString)
 	if !exists {
-		logger.Warning("router not exists")
+		logger.Warn("router not exists")
 		return false, errors.New(125)
 	}
 
@@ -289,12 +290,12 @@ func (r *Table) SetRouterStatus(router *Router, status Status) (ok bool, err err
 	}
 	resp, err := utils.GetKV(r.cli, router.key(constant.StatusKeyString))
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return false, err
 	}
 	if resp.Count > 0 {
 		if _, err := utils.PutKV(r.cli, router.key(constant.StatusKeyString), status.String()); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return false, err
 		}
 	}
@@ -305,7 +306,7 @@ func (r *Table) SetRouterStatus(router *Router, status Status) (ok bool, err err
 func (r *Table) SetEndpointOnline(ep *Endpoint) error {
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if !exists {
-		logger.Warning("endpoint not exists")
+		logger.Warn("endpoint not exists")
 		return errors.New(139)
 	}
 	resp, err := utils.GetKV(r.cli, ep.key(constant.FailedTimesKeyString))
@@ -317,11 +318,11 @@ func (r *Table) SetEndpointOnline(ep *Endpoint) error {
 		//
 	} else {
 		if _, err := utils.PutKV(r.cli, ep.key(constant.FailedTimesKeyString), "0"); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 		}
 	}
 	if _, err := utils.PutKV(r.cli, ep.key(constant.StatusKeyString), Online.String()); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	ep.setStatus(Online)
@@ -331,7 +332,7 @@ func (r *Table) SetEndpointOnline(ep *Endpoint) error {
 func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 	_, exists := r.endpointTable.Load(ep.nameString)
 	if !exists {
-		logger.Warning("endpoint not exists")
+		logger.Warn("endpoint not exists")
 		return errors.New(139)
 	}
 	switch status {
@@ -347,29 +348,29 @@ func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 		if resp.Count == 0 {
 			logger.Debugf("no failed times key")
 			if _, err := utils.PutKV(r.cli, ep.key(constant.FailedTimesKeyString), "1"); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 			}
 		} else {
 			failedTimes, err = strconv.ParseInt(string(resp.Kvs[0].Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				failedTimes = 1
 			}
 			if _, err := utils.PutKV(r.cli, ep.key(constant.FailedTimesKeyString), strconv.FormatInt(failedTimes+1, 10)); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 			}
 		}
 		logger.Debugf("HealthCheck Retry: failedTimes: %d, maxRetryTimes: %d", int(failedTimes), int(ep.healthCheck.retryTime))
 		if int(failedTimes) >= int(ep.healthCheck.retryTime) {
 			// exceed max retry times, tag this ep to offline
 			if _, err := utils.PutKV(r.cli, ep.key(constant.StatusKeyString), Offline.String()); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			}
 			ep.setStatus(Offline)
 		} else {
 			if _, err := utils.PutKV(r.cli, ep.key(constant.StatusKeyString), BreakDown.String()); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			}
 			ep.setStatus(BreakDown)
@@ -377,13 +378,13 @@ func (r *Table) SetEndpointStatus(ep *Endpoint, status Status) error {
 		return nil
 	case Offline:
 		if _, err := utils.PutKV(r.cli, ep.key(constant.StatusKeyString), status.String()); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		ep.setStatus(status)
 		return nil
 	default:
-		logger.Warningf("unrecognized status: %s", status.String())
+		logger.Warnf("unrecognized status: %s", status.String())
 		return nil
 	}
 }

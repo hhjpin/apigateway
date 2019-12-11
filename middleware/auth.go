@@ -4,6 +4,7 @@ import (
 	"git.henghajiang.com/backend/api_gateway_v2/middleware/utils"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gomodule/redigo/redis"
+	"github.com/hhjpin/goutils/logger"
 	"github.com/valyala/fasthttp"
 	"strings"
 	"time"
@@ -65,7 +66,7 @@ func (a *Auth) Work(ctx *fasthttp.RequestCtx, errChan chan error) {
 			return []byte(tokenSignature), nil
 		})
 		if err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 		} else {
 
 			userId, _ := GetUserByToken(token)

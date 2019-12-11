@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"github.com/hhjpin/goutils/logger"
 	"net/http"
 	"os"
 	"time"
@@ -72,6 +73,6 @@ func Logger(code int, path, method, clientIP string, start time.Time) {
 		lightCyan, path,
 	)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 	}
 }

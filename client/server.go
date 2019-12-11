@@ -5,14 +5,10 @@ import (
 	"git.henghajiang.com/backend/api_gateway_v2/client/hander"
 	"git.henghajiang.com/backend/api_gateway_v2/conf"
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
-	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/gin-gonic/gin"
+	"github.com/hhjpin/goutils/logger"
 	"net/http"
 	"os"
-)
-
-var (
-	logger = log.Logger
 )
 
 func Run(table *routing.Table) {
@@ -34,7 +30,7 @@ func Run(table *routing.Table) {
 	r.POST(pre+"/api/v1/gw/client/register", hander.RegisterClient)
 
 	if err := r.Run(fmt.Sprintf("%s:%d", cf.ListenHost, cf.ListenPort)); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		os.Exit(-1)
 	}
 }

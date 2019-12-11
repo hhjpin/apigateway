@@ -3,7 +3,7 @@ package middleware
 import (
 	"bytes"
 	"fmt"
-	"git.henghajiang.com/backend/golang_utils/log"
+	"github.com/hhjpin/goutils/logger"
 	"github.com/valyala/fasthttp"
 	"io/ioutil"
 	"runtime"
@@ -15,8 +15,6 @@ type Middleware interface {
 }
 
 var (
-	logger = log.Logger
-
 	dunno     = []byte("???")
 	centerDot = []byte("·")
 	dot       = []byte(".")
@@ -64,7 +62,7 @@ func stack(skip int) []byte {
 		}
 
 		if _, err := fmt.Fprintf(buf, "%s:%d (0x%x)\n", file, line, pc); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 		}
 		if file != lastFile {
 			data, err := ioutil.ReadFile(file)
@@ -75,7 +73,7 @@ func stack(skip int) []byte {
 			lastFile = file
 		}
 		if _, err := fmt.Fprintf(buf, "\t%s: %s\n", function(pc), source(lines, line)); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 		}
 	}
 	return buf.Bytes()

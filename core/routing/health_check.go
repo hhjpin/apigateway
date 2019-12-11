@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/core/utils"
-	"git.henghajiang.com/backend/golang_utils/errors"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 	"github.com/valyala/fasthttp"
 	"strconv"
 )
@@ -57,19 +58,19 @@ func (r *Table) doHealthCheck() {
 	r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) bool {
 		var status Status
 		if value.status == Offline {
-			logger.Warningf("EndPoint [%s] OFFLINE, skip health check", value.nameString)
+			logger.Warnf("EndPoint [%s] OFFLINE, skip health check", value.nameString)
 			return false
 		}
 		resp, err := utils.GetKV(r.cli, value.key(constant.StatusKeyString))
 		if err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			status = BreakDown
 		} else {
 			for _, kv := range resp.Kvs {
 				if bytes.Equal(kv.Key, []byte(value.key(constant.StatusKeyString))) {
 					statusInt, err := strconv.ParseInt(string(kv.Value), 10, 64)
 					if err != nil {
-						logger.Exception(err)
+						logger.Error(err)
 						status = BreakDown
 					} else {
 						status = Status(statusInt)

@@ -88,7 +88,7 @@
 	)
 	go func(g *golang.ApiGatewayRegistrant) {
 		if err := g.Register(); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 		}
 	}(&gw)
 ```
@@ -109,7 +109,7 @@ func exit(gw *golang.ApiGatewayRegistrant) {
 	<-signalChan
 	logger.Infof("service exiting ...")
 	if err := gw.Unregister(); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 	}
 	os.Exit(0)
 }

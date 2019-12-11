@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/core/utils"
-	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 	"os"
 	"strconv"
 )
@@ -22,7 +23,7 @@ func InitRoutingTable(cli *clientv3.Client) *Table {
 	ol := NewOnlineRouteTableMap()
 	svrMap, epMap, err := initServiceNode(cli)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		os.Exit(-1)
 	}
 	rt.serviceTable = *svrMap
@@ -30,7 +31,7 @@ func InitRoutingTable(cli *clientv3.Client) *Table {
 	rt.onlineTable = *ol
 	routerTable, table, err := initRouter(cli, &rt.serviceTable)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 	}
 	rt.table = *table
 	rt.routerTable = *routerTable
@@ -77,7 +78,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 
 	resp, err := utils.GetPrefixKV(cli, constant.ServiceDefinition, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return svrMap, epMap, err
 	}
 	for _, kv := range resp.Kvs {
@@ -99,7 +100,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 
 					err = json.Unmarshal(kv.Value, &nodeSlice)
 					if err != nil {
-						logger.Exception(err)
+						logger.Error(err)
 						return nil, nil, err
 					}
 					for _, n := range nodeSlice {
@@ -123,7 +124,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 						return false
 					})
 				} else {
-					logger.Warningf("unrecognized node attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
+					logger.Warnf("unrecognized node attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
 				}
 			} else {
 				if bytes.Equal(tmp[1], constant.NameKeyBytes) {
@@ -150,7 +151,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 					}
 					err = json.Unmarshal(kv.Value, &nodeSlice)
 					if err != nil {
-						logger.Exception(err)
+						logger.Error(err)
 						return nil, nil, err
 					}
 					for _, n := range nodeSlice {
@@ -168,7 +169,7 @@ func initServiceNode(cli *clientv3.Client) (*ServiceTableMap, *EndpointTableMap,
 						return false
 					})
 				} else {
-					logger.Warningf("unrecognized node attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
+					logger.Warnf("unrecognized node attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
 				}
 			}
 		}
@@ -181,7 +182,7 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 
 	resp, err := utils.GetPrefixKV(cli, constant.NodePrefixDefinition+nodeID, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return nil, err
 	}
 	for _, kv := range resp.Kvs {
@@ -196,14 +197,14 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 		} else if bytes.Equal(key, constant.PortKeyBytes) {
 			tmpInt, err := strconv.ParseUint(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return nil, err
 			}
 			ep.port = int(tmpInt)
 		} else if bytes.Equal(key, constant.StatusKeyBytes) {
 			tmpInt, err := strconv.ParseUint(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return nil, err
 			}
 			switch Status(uint8(tmpInt)) {
@@ -222,7 +223,7 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 			// get health check info
 			respA, err := utils.GetPrefixKV(cli, constant.HealthCheckPrefixDefinition+string(kv.Value), clientv3.WithPrefix())
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return nil, err
 			}
 
@@ -237,21 +238,21 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 				} else if bytes.Equal(keyA, constant.TimeoutKeyBytes) {
 					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
-						logger.Exception(err)
+						logger.Error(err)
 						return nil, err
 					}
 					hc.timeout = uint8(tmpInt)
 				} else if bytes.Equal(keyA, constant.IntervalKeyBytes) {
 					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
-						logger.Exception(err)
+						logger.Error(err)
 						return nil, err
 					}
 					hc.interval = uint8(tmpInt)
 				} else if bytes.Equal(keyA, constant.RetryKeyBytes) {
 					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
-						logger.Exception(err)
+						logger.Error(err)
 						return nil, err
 					}
 					if tmpInt == 0 {
@@ -262,18 +263,18 @@ func initEndpointNode(cli *clientv3.Client, nodeID string) (*Endpoint, error) {
 				} else if bytes.Equal(keyA, constant.RetryTimeKeyBytes) {
 					tmpInt, err := strconv.ParseUint(string(kvA.Value), 10, 64)
 					if err != nil {
-						logger.Exception(err)
+						logger.Error(err)
 						return nil, err
 					}
 					hc.retryTime = uint8(tmpInt)
 				} else {
 					// unrecognized attribute
-					logger.Warningf("unrecognized health check attribute, key: %s, value: %s", string(kvA.Key), string(kvA.Value))
+					logger.Warnf("unrecognized health check attribute, key: %s, value: %s", string(kvA.Key), string(kvA.Value))
 				}
 			}
 			ep.healthCheck = &hc
 		} else {
-			logger.Warningf("unrecognized node attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
+			logger.Warnf("unrecognized node attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
 		}
 	}
 
@@ -290,14 +291,14 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 
 	resp, err := utils.GetPrefixKV(cli, constant.RouterDefinition, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return nil, nil, err
 	}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, constant.RouterDefinitionBytes)
 		tmpSlice := bytes.Split(key, constant.SlashBytes)
 		if len(tmpSlice) != 2 {
-			logger.Warningf("invalid router definition: %s", key)
+			logger.Warnf("invalid router definition: %s", key)
 			continue
 		} else {
 			rName := bytes.TrimPrefix(tmpSlice[0], constant.RouterPrefixBytes)
@@ -311,7 +312,7 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 				// do nothing
 			} else if bytes.Equal(attr, constant.NameKeyBytes) {
 				if !bytes.Equal(rName, kv.Value) {
-					logger.Warningf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
+					logger.Warnf("inconsistent router definition: %s %s", string(kv.Key), string(kv.Value))
 					continue
 				}
 				r.name = kv.Value
@@ -337,7 +338,7 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 			} else if bytes.Equal(attr, constant.StatusKeyBytes) {
 				// do nothing
 			} else {
-				logger.Warningf("unrecognized health check attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
+				logger.Warnf("unrecognized health check attribute, key: %s, value: %s", string(kv.Key), string(kv.Value))
 			}
 		}
 	}
@@ -356,14 +357,14 @@ func initRouter(cli *clientv3.Client, svrMap *ServiceTableMap) (*RouterTableMap,
 func (r *Table) CreateRouter(name string, key string) error {
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	router := &Router{}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, []byte(key))
 		if bytes.Contains(key, constant.SlashBytes) {
-			logger.Warningf("invalid router attribute key")
+			logger.Warnf("invalid router attribute key")
 			return errors.NewFormat(200, "invalid router attribute key")
 		}
 		keyStr := string(key)
@@ -404,7 +405,7 @@ func (r *Table) CreateRouter(name string, key string) error {
 	}
 
 	if router.frontendApi == nil {
-		logger.Warningf("router %s frontendApi is not ready", name)
+		logger.Warnf("router %s frontendApi is not ready", name)
 		return errors.New(126)
 	}
 
@@ -413,11 +414,11 @@ func (r *Table) CreateRouter(name string, key string) error {
 	confirm, _ := router.service.checkEndpointStatus(Online)
 	if len(confirm) > 0 {
 		if err := router.service.ResetOnlineEndpointRing(confirm); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		if _, err := r.SetRouterOnline(router); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 	}
@@ -437,7 +438,7 @@ func (r *Table) RefreshRouterByName(name string, key string) error {
 func (r *Table) RefreshRouter(router *Router, key string) error {
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	if router.CheckStatus(Online) {
@@ -449,7 +450,7 @@ func (r *Table) RefreshRouter(router *Router, key string) error {
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, []byte(key))
 		if bytes.Contains(key, constant.SlashBytes) {
-			logger.Warningf("invalid router attribute key")
+			logger.Warnf("invalid router attribute key")
 			return errors.NewFormat(200, "invalid router attribute key")
 		}
 		keyStr := string(key)
@@ -492,11 +493,11 @@ func (r *Table) RefreshRouter(router *Router, key string) error {
 	confirm, _ := router.service.checkEndpointStatus(Online)
 	if len(confirm) > 0 {
 		if err := router.service.ResetOnlineEndpointRing(confirm); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		if _, err := r.SetRouterOnline(router); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 	}
@@ -519,14 +520,14 @@ func (r *Table) DeleteRouter(name string) error {
 func (r *Table) CreateService(name string, key string) error {
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	svr := &Service{}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, []byte(key))
 		if bytes.Contains(key, constant.SlashBytes) {
-			logger.Warningf("invalid service attribute key")
+			logger.Warnf("invalid service attribute key")
 			return errors.NewFormat(200, "invalid service attribute key")
 		}
 		keyStr := string(key)
@@ -534,7 +535,7 @@ func (r *Table) CreateService(name string, key string) error {
 		case constant.NodeKeyString:
 			var nodeSlice []string
 			if err := json.Unmarshal(kv.Value, &nodeSlice); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			}
 			svr.ep = NewEndpointTableMap()
@@ -549,7 +550,7 @@ func (r *Table) CreateService(name string, key string) error {
 			confirm, _ := svr.checkEndpointStatus(Online)
 			if len(confirm) > 0 {
 				if err := svr.ResetOnlineEndpointRing(confirm); err != nil {
-					logger.Exception(err)
+					logger.Error(err)
 				}
 			}
 		case constant.NameKeyString:
@@ -570,7 +571,7 @@ func (r *Table) CreateService(name string, key string) error {
 				value.setStatus(Online)
 				if _, ok := r.onlineTable.Load(value.frontendApi); ok {
 					// router has no available service but exists in online api table
-					logger.Warningf("router has no available service but exists in online api table")
+					logger.Warnf("router has no available service but exists in online api table")
 				} else {
 					r.onlineTable.Store(value.frontendApi, value)
 				}
@@ -592,14 +593,14 @@ func (r *Table) RefreshServiceByName(name string, key string) error {
 func (r *Table) RefreshService(ori *Service, key string) error {
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	svr := &Service{}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, []byte(key))
 		if bytes.Contains(key, constant.SlashBytes) {
-			logger.Warningf("invalid service attribute key")
+			logger.Warnf("invalid service attribute key")
 			return errors.NewFormat(200, "invalid service attribute key")
 		}
 		keyStr := string(key)
@@ -607,7 +608,7 @@ func (r *Table) RefreshService(ori *Service, key string) error {
 		case constant.NodeKeyString:
 			var nodeSlice []string
 			if err := json.Unmarshal(kv.Value, &nodeSlice); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			}
 			svr.ep = NewEndpointTableMap()
@@ -622,7 +623,7 @@ func (r *Table) RefreshService(ori *Service, key string) error {
 			confirm, _ := svr.checkEndpointStatus(Online)
 			if len(confirm) > 0 {
 				if err := svr.ResetOnlineEndpointRing(confirm); err != nil {
-					logger.Exception(err)
+					logger.Error(err)
 				}
 			}
 		case constant.NameKeyString:
@@ -653,7 +654,7 @@ func (r *Table) RefreshService(ori *Service, key string) error {
 				}
 			} else {
 				if _, err := r.SetRouterStatus(value, BreakDown); err != nil {
-					logger.Exception(err)
+					logger.Error(err)
 					return
 				}
 				if _, ok := r.onlineTable.Load(value.frontendApi); !ok {
@@ -661,7 +662,7 @@ func (r *Table) RefreshService(ori *Service, key string) error {
 				}
 			}
 			if err := r.RefreshRouter(value, fmt.Sprintf("/Router/Router-%s/", string(value.name))); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 			}
 		}
 	})
@@ -688,14 +689,14 @@ func (r *Table) DeleteService(name string) error {
 func (r *Table) CreateEndpoint(id string, key string) error {
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	ep := &Endpoint{}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, []byte(key))
 		if bytes.Contains(key, constant.SlashBytes) {
-			logger.Warningf("invalid endpoint attribute key")
+			logger.Warnf("invalid endpoint attribute key")
 			return errors.NewFormat(200, "invalid endpoint attribute key")
 		}
 		keyStr := string(key)
@@ -703,7 +704,7 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 		case constant.IdKeyString:
 			// is forbidden to modify node id
 			if id != string(kv.Value) {
-				logger.Warningf("node key is not in accord with node id, node: %s", key)
+				logger.Warnf("node key is not in accord with node id, node: %s", key)
 				ep.id = id
 			} else {
 				ep.id = string(kv.Value)
@@ -716,7 +717,7 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 		case constant.PortKeyString:
 			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				logger.Error("wrong type of endpoint port")
 				return err
 			}
@@ -727,7 +728,7 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 			// do nothing
 		case constant.HealthCheckKeyString:
 			if hc, err := CreateHealthCheck(r.cli, id, constant.HealthCheckPrefixDefinition+id+constant.Slash); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			} else {
 				ep.healthCheck = hc
@@ -766,7 +767,7 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 	if !flag {
 		resp, err := utils.GetPrefixKV(r.cli, constant.ServiceDefinition, clientv3.WithPrefix())
 		if err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		flag2 := false
@@ -774,7 +775,7 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 			tmp := bytes.TrimPrefix(kv.Key, []byte(constant.ServiceDefinition))
 			svrSlice := bytes.Split(tmp, constant.SlashBytes)
 			if len(svrSlice) < 2 {
-				logger.Warningf("invalid endpoint attribute key")
+				logger.Warnf("invalid endpoint attribute key")
 				return errors.NewFormat(200, "invalid endpoint attribute key")
 			}
 			svr := svrSlice[0]
@@ -783,7 +784,7 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 			if string(key) == constant.NodeKeyString {
 				var nodeSlice []string
 				if err := json.Unmarshal(kv.Value, &nodeSlice); err != nil {
-					logger.Exception(err)
+					logger.Error(err)
 					return err
 				}
 				for _, n := range nodeSlice {
@@ -794,7 +795,7 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 							// waiting create_service func to connect this endpoint
 						} else {
 							if err := r.RefreshService(s, fmt.Sprintf("/Service/Service-%s/", s.nameString)); err != nil {
-								logger.Exception(err)
+								logger.Error(err)
 							}
 						}
 						flag2 = true
@@ -805,7 +806,7 @@ func (r *Table) CreateEndpoint(id string, key string) error {
 		}
 		if !flag2 {
 			// this endpoint is not used by any service
-			logger.Warningf("this endpoint is not used by any service")
+			logger.Warnf("this endpoint is not used by any service")
 		}
 	}
 	return nil
@@ -824,14 +825,14 @@ func (r *Table) RefreshEndpoint(oriEp *Endpoint, key string) error {
 	var newStatus Status
 	resp, err := utils.GetPrefixKV(r.cli, key, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	ep := &Endpoint{}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, []byte(key))
 		if bytes.Contains(key, constant.SlashBytes) {
-			logger.Warningf("invalid endpoint attribute key")
+			logger.Warnf("invalid endpoint attribute key")
 			return errors.NewFormat(200, "invalid endpoint attribute key")
 		}
 		keyStr := string(key)
@@ -839,7 +840,7 @@ func (r *Table) RefreshEndpoint(oriEp *Endpoint, key string) error {
 		case constant.IdKeyString:
 			// is forbidden to modify node id
 			if oriEp.id != string(kv.Value) {
-				logger.Warningf("node key is not in accord with node id, node: %s", key)
+				logger.Warnf("node key is not in accord with node id, node: %s", key)
 				ep.id = oriEp.id
 			} else {
 				ep.id = string(kv.Value)
@@ -852,7 +853,7 @@ func (r *Table) RefreshEndpoint(oriEp *Endpoint, key string) error {
 		case constant.PortKeyString:
 			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				logger.Error("wrong type of endpoint port")
 				return err
 			}
@@ -862,13 +863,13 @@ func (r *Table) RefreshEndpoint(oriEp *Endpoint, key string) error {
 		case constant.StatusKeyString:
 			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			}
 			newStatus = Status(tmp)
 		case constant.HealthCheckKeyString:
 			if hc, err := RefreshHealthCheck(r.cli, oriEp.id, constant.HealthCheckPrefixDefinition+oriEp.id+constant.Slash); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			} else {
 				ep.healthCheck = hc
@@ -890,7 +891,7 @@ func (r *Table) RefreshEndpoint(oriEp *Endpoint, key string) error {
 		}
 		if oriEp.status != ep.status {
 			if err := r.SetEndpointStatus(oriEp, ep.status); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 			}
 		}
 		oriEp.healthCheck = ep.healthCheck
@@ -910,7 +911,7 @@ func (r *Table) RefreshEndpoint(oriEp *Endpoint, key string) error {
 			ori.status = ep.status
 
 			if err := r.RefreshService(value, fmt.Sprintf("/Service/Service-%s/", value.nameString)); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 			}
 		}
 		return false
@@ -927,7 +928,7 @@ func (r *Table) DeleteEndpoint(id string) error {
 			if _, ok := value.ep.Load(ep.nameString); ok {
 				value.ep.Delete(ep.nameString)
 				if err = r.RefreshService(value, fmt.Sprintf("/Service/Service-%s/", value.nameString)); err != nil {
-					logger.Exception(err)
+					logger.Error(err)
 					return true
 				}
 			}
@@ -942,7 +943,7 @@ func (r *Table) RefreshHealthCheck(id string, key string) error {
 	var err error
 	hc, err := RefreshHealthCheck(r.cli, id, key)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	r.endpointTable.Range(func(key EndpointNameString, value *Endpoint) bool {
@@ -954,7 +955,7 @@ func (r *Table) RefreshHealthCheck(id string, key string) error {
 			value.healthCheck.timeout = hc.timeout
 
 			if err = r.RefreshEndpoint(value, fmt.Sprintf("/Node/Node-%s/", value.id)); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 			}
 			return true
 		}
@@ -966,14 +967,14 @@ func (r *Table) RefreshHealthCheck(id string, key string) error {
 func CreateHealthCheck(cli *clientv3.Client, id string, key string) (*HealthCheck, error) {
 	resp, err := utils.GetPrefixKV(cli, key, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return nil, err
 	}
 	hc := &HealthCheck{}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, []byte(key))
 		if bytes.Contains(key, constant.SlashBytes) {
-			logger.Warningf("invalid health-check attribute key")
+			logger.Warnf("invalid health-check attribute key")
 			return nil, errors.NewFormat(200, "invalid health-check attribute key")
 		}
 		keyStr := string(key)
@@ -981,7 +982,7 @@ func CreateHealthCheck(cli *clientv3.Client, id string, key string) (*HealthChec
 		case constant.IdKeyString:
 			// is forbidden to modify health-check id
 			if id != string(kv.Value) {
-				logger.Warningf("node key is not in accord with node id, node: %s", key)
+				logger.Warnf("node key is not in accord with node id, node: %s", key)
 				hc.id = id
 			} else {
 				hc.id = string(kv.Value)
@@ -991,7 +992,7 @@ func CreateHealthCheck(cli *clientv3.Client, id string, key string) (*HealthChec
 		case constant.IntervalKeyString:
 			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return nil, err
 			}
 			hc.interval = uint8(tmp)
@@ -1001,20 +1002,20 @@ func CreateHealthCheck(cli *clientv3.Client, id string, key string) (*HealthChec
 			} else if string(kv.Value) == "1" {
 				hc.retry = true
 			} else {
-				logger.Warningf("unrecognized retry value: %+v", string(kv.Value))
+				logger.Warnf("unrecognized retry value: %+v", string(kv.Value))
 				hc.retry = false
 			}
 		case constant.RetryTimeKeyString:
 			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return nil, err
 			}
 			hc.retryTime = uint8(tmp)
 		case constant.TimeoutKeyString:
 			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return nil, err
 			}
 			hc.timeout = uint8(tmp)
@@ -1029,14 +1030,14 @@ func CreateHealthCheck(cli *clientv3.Client, id string, key string) (*HealthChec
 func RefreshHealthCheck(cli *clientv3.Client, id string, key string) (*HealthCheck, error) {
 	resp, err := utils.GetPrefixKV(cli, key, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return nil, err
 	}
 	hc := &HealthCheck{}
 	for _, kv := range resp.Kvs {
 		key := bytes.TrimPrefix(kv.Key, []byte(key))
 		if bytes.Contains(key, constant.SlashBytes) {
-			logger.Warningf("invalid health-check attribute key")
+			logger.Warnf("invalid health-check attribute key")
 			return nil, errors.NewFormat(200, "invalid health-check attribute key")
 		}
 		keyStr := string(key)
@@ -1044,7 +1045,7 @@ func RefreshHealthCheck(cli *clientv3.Client, id string, key string) (*HealthChe
 		case constant.IdKeyString:
 			// is forbidden to modify health-check id
 			if id != string(kv.Value) {
-				logger.Warningf("node key is not in accord with node id, node: %s", key)
+				logger.Warnf("node key is not in accord with node id, node: %s", key)
 				hc.id = id
 			} else {
 				hc.id = string(kv.Value)
@@ -1054,7 +1055,7 @@ func RefreshHealthCheck(cli *clientv3.Client, id string, key string) (*HealthChe
 		case constant.IntervalKeyString:
 			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return nil, err
 			}
 			hc.interval = uint8(tmp)
@@ -1064,20 +1065,20 @@ func RefreshHealthCheck(cli *clientv3.Client, id string, key string) (*HealthChe
 			} else if string(kv.Value) == "1" {
 				hc.retry = true
 			} else {
-				logger.Warningf("unrecognized retry value: %+v", string(kv.Value))
+				logger.Warnf("unrecognized retry value: %+v", string(kv.Value))
 				hc.retry = false
 			}
 		case constant.RetryTimeKeyString:
 			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return nil, err
 			}
 			hc.retryTime = uint8(tmp)
 		case constant.TimeoutKeyString:
 			tmp, err := strconv.ParseInt(string(kv.Value), 10, 64)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return nil, err
 			}
 			hc.timeout = uint8(tmp)

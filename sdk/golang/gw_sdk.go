@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/deckarep/golang-set"
+	"github.com/hhjpin/goutils/logger"
 	"os"
 	"strconv"
 	"strings"
@@ -54,10 +54,6 @@ type ApiGatewayRegistrant struct {
 	hc      *HealthCheck
 	router  []*Router
 }
-
-var (
-	logger = log.Logger
-)
 
 func NewHealthCheck(path string, timeout, interval, retryTime uint8, retry bool) *HealthCheck {
 	return &HealthCheck{
@@ -219,7 +215,7 @@ func (gw *ApiGatewayRegistrant) deleteMany(k interface{}, opts ...clientv3.OpOpt
 func (gw *ApiGatewayRegistrant) getAttr(key string) string {
 	resp, err := gw.getKeyValue(key)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return ""
 	}
 	if resp.Count == 0 {
@@ -227,7 +223,7 @@ func (gw *ApiGatewayRegistrant) getAttr(key string) string {
 	} else if resp.Count == 1 {
 		return string(resp.Kvs[0].Value)
 	} else {
-		logger.Warningf("attr [%s] exists more than one key", key)
+		logger.Warnf("attr [%s] exists more than one key", key)
 		os.Exit(-1)
 		return ""
 	}
@@ -237,7 +233,7 @@ func (gw *ApiGatewayRegistrant) getAttr(key string) string {
 func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
 	resp, err := gw.getKeyValueWithPrefix(ServiceDefinitionPrefix)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	kvs := make(map[string]string)
@@ -246,7 +242,7 @@ func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
 		key := bytes.TrimPrefix(kv.Key, ServiceDefinitionBytes)
 		tmpSlice := bytes.Split(key, SlashBytes)
 		if len(tmpSlice) != 2 {
-			logger.Warningf("invalid router definition: %s", key)
+			logger.Warnf("invalid router definition: %s", key)
 			continue
 		}
 		sName := string(bytes.TrimPrefix(tmpSlice[0], ServicePrefixBytes))
@@ -255,7 +251,7 @@ func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
 			var nodeSlice []string
 			err := json.Unmarshal(kv.Value, &nodeSlice)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				continue
 			}
 			s := mapset.NewSet()
@@ -278,7 +274,7 @@ func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
 					prefix := fmt.Sprintf(NodeDefinition, nodeId)
 					resp2, err := gw.getKeyValueWithPrefix(prefix)
 					if err != nil {
-						logger.Exception(err)
+						logger.Error(err)
 						return err
 					}
 					var host string
@@ -301,7 +297,7 @@ func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
 			if isRemove {
 				nodeByteSlice, err := json.Marshal(s.ToSlice())
 				if err != nil {
-					logger.Exception(err)
+					logger.Error(err)
 					continue
 				} else {
 					logger.Info("remove node in service: ", string(kv.Key), string(nodeByteSlice))
@@ -313,13 +309,13 @@ func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
 	if len(kvs) > 0 {
 		err = gw.putMany(kvs)
 		if err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		logger.Info("delete invalid node: ", dkvs)
 		err = gw.deleteMany(dkvs, clientv3.WithPrefix())
 		if err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 	}
@@ -329,7 +325,7 @@ func (gw *ApiGatewayRegistrant) deleteInvalidNodeInService() error {
 
 func (gw *ApiGatewayRegistrant) registerNode() error {
 	if err := gw.deleteInvalidNodeInService(); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 
@@ -337,7 +333,7 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 	hcDefinition := fmt.Sprintf(HealthCheckDefinition, hc.ID)
 	resp, err := gw.getKeyValueWithPrefix(hcDefinition)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	kvs := make(map[string]string)
@@ -389,14 +385,14 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 
 	err = gw.putMany(kvs)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 
 	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
 	resp, err = gw.getKeyValueWithPrefix(nodeDefinition)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	n := gw.node
@@ -438,7 +434,7 @@ func (gw *ApiGatewayRegistrant) registerNode() error {
 
 	err = gw.putMany(kvs)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 
@@ -449,7 +445,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 	serviceDefinition := fmt.Sprintf(ServiceDefinition, gw.service.Name)
 	resp, err := gw.getKeyValueWithPrefix(serviceDefinition)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	kvs := make(map[string]string)
@@ -461,7 +457,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 		}
 		nodeSlice, err := json.Marshal(nodes)
 		if err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 
@@ -470,7 +466,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 	} else {
 		resp, err := gw.getKeyValue(serviceDefinition + NodeKey)
 		if err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		if resp.Count == 0 {
@@ -480,7 +476,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 			var nodeSlice []string
 			err := json.Unmarshal(resp.Kvs[0].Value, &nodeSlice)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			}
 			s := mapset.NewSet()
@@ -491,7 +487,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 				s.Add(gw.node.ID)
 				nodeByteSlice, err := json.Marshal(s.ToSlice())
 				if err != nil {
-					logger.Exception(err)
+					logger.Error(err)
 					os.Exit(-1)
 				} else {
 					kvs[serviceDefinition+NodeKey] = string(nodeByteSlice)
@@ -501,7 +497,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 	}
 	err = gw.putMany(kvs)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	return nil
@@ -509,7 +505,7 @@ func (gw *ApiGatewayRegistrant) registerService() error {
 
 func (gw *ApiGatewayRegistrant) registerRouter() error {
 	if err := gw.deleteInvalidRoutes(); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 
@@ -520,7 +516,7 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 		routerName := fmt.Sprintf(RouterDefinition, r.Name)
 		resp, err := gw.getKeyValueWithPrefix(routerName)
 		if err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		if strings.Index(r.Frontend, "/") == 0 {
@@ -565,14 +561,14 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 					}
 					ori[routerName+ServiceKey] = string(kv.Value)
 				} else {
-					logger.Warningf("unrecognized router key: %s", string(kv.Key))
+					logger.Warnf("unrecognized router key: %s", string(kv.Key))
 				}
 			}
 			if _, ok := kvs[routerName+FrontendKey]; ok {
 				if ori[routerName+FrontendKey] != kvs[routerName+FrontendKey] {
 					// just a new route, but have a duplicated name
 					logger.Debugf("original frontend key: %s; current frontend key: %s", ori[routerName+FrontendKey], kvs[routerName+FrontendKey])
-					logger.Warningf("router {%s} maybe a new router, please checkout", ori[routerName+NameKey])
+					logger.Warnf("router {%s} maybe a new router, please checkout", ori[routerName+NameKey])
 					os.Exit(-1)
 				}
 			}
@@ -580,15 +576,15 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 				logger.Infof("router keys waiting to be updated: %+v", kvs)
 				if ori[routerName+StatusKey] == "1" {
 					// original router still alive, can not modify router
-					logger.Warning("original router still alive, can not modify router: ", routerName)
-					logger.Warning("if need modify online router, please use a new one instead")
+					logger.Warn("original router still alive, can not modify router: ", routerName)
+					logger.Warn("if need modify online router, please use a new one instead")
 					os.Exit(-1)
 				}
 			}
 		}
 
 		if err = gw.putMany(kvs); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 	}
@@ -599,7 +595,7 @@ func (gw *ApiGatewayRegistrant) registerRouter() error {
 func (gw *ApiGatewayRegistrant) deleteInvalidRoutes() error {
 	resp, err := gw.getKeyValueWithPrefix(RouterDefinitionPrefix)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 
@@ -612,7 +608,7 @@ func (gw *ApiGatewayRegistrant) deleteInvalidRoutes() error {
 		key := bytes.TrimPrefix(kv.Key, RouterDefinitionBytes)
 		tmpSlice := bytes.Split(key, SlashBytes)
 		if len(tmpSlice) != 2 {
-			logger.Warningf("invalid router definition: %s", key)
+			logger.Warnf("invalid router definition: %s", key)
 			continue
 		}
 		rName := string(bytes.TrimPrefix(tmpSlice[0], RouterPrefixBytes))
@@ -635,7 +631,7 @@ func (gw *ApiGatewayRegistrant) deleteInvalidRoutes() error {
 
 	err = gw.deleteMany(invalidKeys, clientv3.WithPrefix())
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	return nil
@@ -643,15 +639,15 @@ func (gw *ApiGatewayRegistrant) deleteInvalidRoutes() error {
 
 func (gw *ApiGatewayRegistrant) Register() error {
 	if err := gw.registerNode(); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	if err := gw.registerService(); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	if err := gw.registerRouter(); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	return nil
@@ -663,7 +659,7 @@ func (gw *ApiGatewayRegistrant) Unregister() error {
 	nodeDefinition := fmt.Sprintf(NodeDefinition, gw.node.ID)
 	resp, err := gw.getKeyValueWithPrefix(nodeDefinition)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	if resp.Count != 0 {
@@ -672,7 +668,7 @@ func (gw *ApiGatewayRegistrant) Unregister() error {
 
 	err = gw.putMany(kvs)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	return nil

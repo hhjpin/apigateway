@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
-	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 	"strings"
 )
 
@@ -55,7 +56,7 @@ func (s *ServiceWatcher) Put(key, val string, isCreate bool) error {
 	svr := strings.TrimPrefix(key, s.prefix+"Service-")
 	tmp := strings.Split(svr, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid service key: %s", key)
+		logger.Warnf("invalid service key: %s", key)
 		return errors.NewFormat(200, fmt.Sprintf("invalid service key: %s", key))
 	}
 	svrName := tmp[0]
@@ -63,18 +64,18 @@ func (s *ServiceWatcher) Put(key, val string, isCreate bool) error {
 	logger.Debugf("[ETCD PUT] Service, key: %s, value: %s, new: %t", key, val, isCreate)
 	if isCreate {
 		if ok, err := validKV(s.cli, svrKey, s.attrs, false); err != nil || !ok {
-			logger.Warningf("new service lack attribute, it may not have been created yet. Suggest to wait")
+			logger.Warnf("new service lack attribute, it may not have been created yet. Suggest to wait")
 			return nil
 		} else {
 			if err := s.table.RefreshServiceByName(svrName, svrKey); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			}
 			return nil
 		}
 	} else {
 		if err := s.table.RefreshServiceByName(svrName, svrKey); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		return nil
@@ -85,18 +86,18 @@ func (s *ServiceWatcher) Delete(key string) error {
 	svr := strings.TrimPrefix(key, s.prefix+"Service-")
 	tmp := strings.Split(svr, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid service key: %s", key)
+		logger.Warnf("invalid service key: %s", key)
 		return errors.NewFormat(200, fmt.Sprintf("invalid service key: %s", key))
 	}
 	svrName := tmp[0]
 	svrKey := s.prefix + fmt.Sprintf(constant.ServicePrefixString, svrName)
 	logger.Debugf("新的Service删除事件, name: %s, key: %s", svrName, svrKey)
 	if ok, err := validKV(s.cli, svrKey, s.attrs, true); err != nil || !ok {
-		logger.Warningf("service attribute still exists, it may not have been deleted yet. Suggest to wait")
+		logger.Warnf("service attribute still exists, it may not have been deleted yet. Suggest to wait")
 		return nil
 	} else {
 		if err := s.table.DeleteService(svrName); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		return nil

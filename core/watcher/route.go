@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
-	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 	"strings"
 )
 
@@ -46,7 +47,7 @@ func (r *RouteWatcher) Put(key, val string, isCreate bool) error {
 	route := strings.TrimPrefix(key, r.prefix+"Router-")
 	tmp := strings.Split(route, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid router key: %s", key)
+		logger.Warnf("invalid router key: %s", key)
 		return errors.NewFormat(200, fmt.Sprintf("invalid router key: %s", key))
 	}
 	routeName := tmp[0]
@@ -54,18 +55,18 @@ func (r *RouteWatcher) Put(key, val string, isCreate bool) error {
 	logger.Debugf("[ETCD PUT] Router, key: %s, val: %s, new: %t", key, val, isCreate)
 	if isCreate {
 		if ok, err := validKV(r.cli, routeKey, r.attrs, false); err != nil || !ok {
-			logger.Warningf("new route lack attribute, it may not have been created yet. Suggest to wait")
+			logger.Warnf("new route lack attribute, it may not have been created yet. Suggest to wait")
 			return nil
 		} else {
 			if err := r.table.RefreshRouterByName(routeName, routeKey); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			}
 			return nil
 		}
 	} else {
 		if err := r.table.RefreshRouterByName(routeName, routeKey); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		return nil
@@ -76,7 +77,7 @@ func (r *RouteWatcher) Delete(key string) error {
 	route := strings.TrimPrefix(key, r.prefix+"Router-")
 	tmp := strings.Split(route, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid router key: %s", key)
+		logger.Warnf("invalid router key: %s", key)
 		return errors.NewFormat(200, fmt.Sprintf("invalid router key: %s", key))
 	}
 	routeName := tmp[0]
@@ -84,11 +85,11 @@ func (r *RouteWatcher) Delete(key string) error {
 	logger.Debugf("新的Router删除事件, name: %s, key: %s", routeName, key)
 
 	//if ok, err := validKV(r.cli, routeKey, r.attrs, true); err != nil || !ok {
-	//	logger.Warningf("route attribute still exists, it may not have been deleted yet. Suggest to wait")
+	//	logger.Warnf("route attribute still exists, it may not have been deleted yet. Suggest to wait")
 	//	return nil
 	//} else {
 	if err := r.table.DeleteRouter(routeName); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	return nil

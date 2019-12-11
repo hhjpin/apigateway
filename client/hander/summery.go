@@ -2,8 +2,8 @@ package hander
 
 import (
 	"git.henghajiang.com/backend/api_gateway_v2/client/model"
-	"git.henghajiang.com/backend/golang_utils/response"
 	"github.com/gin-gonic/gin"
+	"github.com/hhjpin/goutils/response"
 	"net/http"
 )
 

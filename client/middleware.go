@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
-	"git.henghajiang.com/backend/golang_utils"
-	"git.henghajiang.com/backend/golang_utils/response"
 	"github.com/gin-gonic/gin"
+	"github.com/hhjpin/goutils/logger"
+	"github.com/hhjpin/goutils/response"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -73,7 +73,7 @@ func stack(skip int) []byte {
 		}
 
 		if _, err := fmt.Fprintf(buf, "%s:%d (0x%x)\n", file, line, pc); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 		}
 		if file != lastFile {
 			data, err := ioutil.ReadFile(file)
@@ -84,7 +84,7 @@ func stack(skip int) []byte {
 			lastFile = file
 		}
 		if _, err := fmt.Fprintf(buf, "\t%s: %s\n", function(pc), source(lines, line)); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 		}
 	}
 	return buf.Bytes()
@@ -125,12 +125,9 @@ func RecoveryWithWriter() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
-				if logger != nil {
-					stack := stack(3)
-					httpRequest, _ := httputil.DumpRequest(c.Request, false)
-					go golang_utils.ErrMail("api gateway err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s\n%s", timeFormat(time.Now()), string(httpRequest), err, stack))
-					logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s\n%s", timeFormat(time.Now()), string(httpRequest), err, stack)
-				}
+				stack := stack(3)
+				httpRequest, _ := httputil.DumpRequest(c.Request, false)
+				logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s\n%s", timeFormat(time.Now()), string(httpRequest), err, stack)
 				c.String(200, `{"err_code": 5,"err_msg":"当前访问量过大, 请稍后再试","err_msg_en":"service busy, please try again","data": {}}`)
 			}
 		}()
@@ -234,7 +231,7 @@ func LoggerWithWriter(out io.Writer, notLogged ...string) gin.HandlerFunc {
 				lightCyan, path,
 			)
 			if err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 			}
 		}
 	}

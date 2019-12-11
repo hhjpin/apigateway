@@ -5,9 +5,9 @@ import (
 	"fmt"
 	config "git.henghajiang.com/backend/api_gateway_v2/conf"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware/utils"
-	"git.henghajiang.com/backend/golang_utils"
-	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/go-ego/murmur"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 	"github.com/valyala/fasthttp"
 	"runtime"
 	"sync"
@@ -163,7 +163,6 @@ func (l *limiter) run(ctx context.Context, recv CountChan) {
 	defer func() {
 		if err := recover(); err != nil {
 			stack := stack(3)
-			go golang_utils.ErrMail("api gateway err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
 			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack)
 		}
 		if ctx.Err() == nil {
@@ -193,7 +192,6 @@ func (l *limiter) consuming(ctx context.Context) {
 	defer func() {
 		if err := recover(); err != nil {
 			stack := stack(3)
-			go golang_utils.ErrMail("api gateway err mail", fmt.Sprintf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack))
 			logger.Errorf("[Recovery] %s panic recovered:\n%s\n%s", timeFormat(time.Now()), err, stack)
 		}
 		if ctx.Err() == nil {

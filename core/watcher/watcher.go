@@ -6,6 +6,7 @@ import (
 	"git.henghajiang.com/backend/api_gateway_v2/core/utils"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/mvcc/mvccpb"
+	"github.com/hhjpin/goutils/logger"
 	"time"
 )
 
@@ -34,15 +35,15 @@ func watch(w Watcher, c clientv3.WatchChan) {
 	for {
 		select {
 		case <-w.Ctx().Done():
-			logger.Exception(w.Ctx().Err())
+			logger.Error(w.Ctx().Err())
 			w.Refresh()
 			c = w.GetWatchChan()
 			Mapping[w] = c
 			goto Over
 		case resp := <-c:
 			if resp.Canceled {
-				logger.Warningf("watch canceled")
-				logger.Exception(w.Ctx().Err())
+				logger.Warnf("watch canceled")
+				logger.Error(w.Ctx().Err())
 				w.Refresh()
 				c = w.GetWatchChan()
 				Mapping[w] = c
@@ -59,7 +60,7 @@ func watch(w Watcher, c clientv3.WatchChan) {
 								value := string(evt.Kv.Value)
 								return func() {
 									if err := w.Put(key, value, evt.IsCreate()); err != nil {
-										logger.Exception(err)
+										logger.Error(err)
 									}
 								}
 							}(),
@@ -70,13 +71,13 @@ func watch(w Watcher, c clientv3.WatchChan) {
 								key := string(evt.Kv.Key)
 								return func() {
 									if err := w.Delete(key); err != nil {
-										logger.Exception(err)
+										logger.Error(err)
 									}
 								}
 							}(),
 						})
 					default:
-						logger.Warningf("unrecognized event type: %d", evt.Type)
+						logger.Warnf("unrecognized event type: %d", evt.Type)
 						continue
 					}
 				}

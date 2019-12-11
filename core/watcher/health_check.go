@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
-	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 	"strings"
 )
 
@@ -47,7 +48,7 @@ func (hc *HealthCheckWatcher) Put(key, val string, isCreate bool) error {
 	healthCheck := strings.TrimPrefix(key, hc.prefix+"HC-")
 	tmp := strings.Split(healthCheck, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid healthCheck key: %s", key)
+		logger.Warnf("invalid healthCheck key: %s", key)
 		return errors.NewFormat(200, fmt.Sprintf("invalid healthCheck key: %s", key))
 	}
 	hcId := tmp[0]
@@ -56,18 +57,18 @@ func (hc *HealthCheckWatcher) Put(key, val string, isCreate bool) error {
 
 	if isCreate {
 		if ok, err := validKV(hc.cli, hcKey, hc.attrs, false); err != nil || !ok {
-			logger.Warningf("new healthCheck lack attribute, it may not have been created yet. Suggest to wait")
+			logger.Warnf("new healthCheck lack attribute, it may not have been created yet. Suggest to wait")
 			return nil
 		} else {
 			if err := hc.table.RefreshHealthCheck(hcId, hcKey); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			}
 			return nil
 		}
 	} else {
 		if err := hc.table.RefreshHealthCheck(hcId, hcKey); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		return nil
@@ -78,7 +79,7 @@ func (hc *HealthCheckWatcher) Delete(key string) error {
 	healthCheck := strings.TrimPrefix(key, hc.prefix+"HC-")
 	tmp := strings.Split(healthCheck, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid healthCheck key: %s", key)
+		logger.Warnf("invalid healthCheck key: %s", key)
 		return errors.NewFormat(200, fmt.Sprintf("invalid healthCheck key: %s", key))
 	}
 	logger.Debugf("[ETCD DELETE] HealthCheck, key: %s", key)

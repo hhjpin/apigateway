@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/core/constant"
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
-	"git.henghajiang.com/backend/golang_utils/errors"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 	"strings"
 )
 
@@ -47,7 +48,7 @@ func (ep *EndpointWatcher) Put(key, val string, isCreate bool) error {
 	endpoint := strings.TrimPrefix(key, ep.prefix+"Node-")
 	tmp := strings.Split(endpoint, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid endpoint key: %s", key)
+		logger.Warnf("invalid endpoint key: %s", key)
 		return errors.NewFormat(200, fmt.Sprintf("invalid endpoint key: %s", key))
 	}
 	endpointId := tmp[0]
@@ -59,18 +60,18 @@ func (ep *EndpointWatcher) Put(key, val string, isCreate bool) error {
 	logger.Debugf("[ETCD PUT] Endpoint, key: %s, value: %s, new: %t", key, val, isCreate)
 	if isCreate {
 		if ok, err := validKV(ep.cli, endpointKey, ep.attrs, false); err != nil || !ok {
-			logger.Warningf("new endpoint lack attribute, it may not have been created yet. Suggest to wait")
+			logger.Warnf("new endpoint lack attribute, it may not have been created yet. Suggest to wait")
 			return nil
 		} else {
 			if err := ep.table.RefreshEndpointById(endpointId, endpointKey); err != nil {
-				logger.Exception(err)
+				logger.Error(err)
 				return err
 			}
 			return nil
 		}
 	} else {
 		if err := ep.table.RefreshEndpointById(endpointId, endpointKey); err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return err
 		}
 		return nil
@@ -81,7 +82,7 @@ func (ep *EndpointWatcher) Delete(key string) error {
 	endpoint := strings.TrimPrefix(key, ep.prefix+"Node-")
 	tmp := strings.Split(endpoint, slash)
 	if len(tmp) < 2 {
-		logger.Warningf("invalid endpoint key: %s", key)
+		logger.Warnf("invalid endpoint key: %s", key)
 		return errors.NewFormat(200, fmt.Sprintf("invalid endpoint key: %s", key))
 	}
 	endpointId := tmp[0]
@@ -89,11 +90,11 @@ func (ep *EndpointWatcher) Delete(key string) error {
 	logger.Debugf("[ETCD DELETE] Endpoint key: %s", key)
 
 	/*if ok, err := validKV(ep.cli, endpointKey, ep.attrs, true); err != nil || !ok {
-		logger.Warningf("endpoint attribute still exists, it may not have been deleted yet. Suggest to wait")
+		logger.Warnf("endpoint attribute still exists, it may not have been deleted yet. Suggest to wait")
 		return nil
 	} else {*/
 	if err := ep.table.DeleteEndpoint(endpointId); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return err
 	}
 	return nil

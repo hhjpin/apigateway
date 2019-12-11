@@ -3,7 +3,8 @@ package middleware
 import (
 	"bytes"
 	"encoding/json"
-	"git.henghajiang.com/backend/golang_utils/errors"
+	"github.com/hhjpin/goutils/errors"
+	"github.com/hhjpin/goutils/logger"
 	"os"
 	"strconv"
 )
@@ -42,7 +43,7 @@ var (
 func init() {
 	tmp, err := os.Hostname()
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		hostName = []byte("unknown-host")
 	} else {
 		hostName = []byte(tmp)

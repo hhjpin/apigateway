@@ -4,9 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"git.henghajiang.com/backend/api_gateway_v2/sdk/golang"
-	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/gin-gonic/gin"
+	"github.com/hhjpin/goutils/logger"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"os"
 	"os/signal"
@@ -16,7 +16,6 @@ import (
 )
 
 var (
-	logger   = log.Logger
 	flagPort = flag.Int("port", 7789, "server listening port")
 )
 
@@ -41,7 +40,7 @@ func exit(gw *golang.ApiGatewayRegistrant) {
 	<-signalChan
 	logger.Infof("service exiting ...")
 	if err := gw.Unregister(); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 	}
 	os.Exit(0)
 }
@@ -76,12 +75,12 @@ func main() {
 	)
 
 	if err := gw.Register(); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		return
 	}
 
 	go exit(&gw)
 	if err := r.Run(fmt.Sprintf(":%d", *flagPort)); err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 	}
 }

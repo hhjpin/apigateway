@@ -2,8 +2,8 @@ package watcher
 
 import (
 	"context"
-	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/hhjpin/goutils/logger"
 )
 
 const (
@@ -15,16 +15,12 @@ const (
 	slash = "/"
 )
 
-var (
-	logger = log.Logger
-)
-
 func validKV(cli *clientv3.Client, prefix string, attrs []string, not bool) (bool, error) {
 	for _, attr := range attrs {
 		ctx := context.Background()
 		resp, err := cli.Get(ctx, prefix+attr)
 		if err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			return false, err
 		}
 		/*for _, kv := range resp.Kvs {

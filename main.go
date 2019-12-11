@@ -8,8 +8,8 @@ import (
 	"git.henghajiang.com/backend/api_gateway_v2/core/routing"
 	"git.henghajiang.com/backend/api_gateway_v2/core/watcher"
 	"git.henghajiang.com/backend/api_gateway_v2/middleware"
-	"git.henghajiang.com/backend/golang_utils/log"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/hhjpin/goutils/logger"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/reuseport"
 	"os"
@@ -26,8 +26,6 @@ type etcdPool struct {
 var (
 	table    *routing.Table
 	EtcdPool = etcdPool{}
-
-	logger = log.Logger
 )
 
 func (p *etcdPool) Load(key string) (cli *clientv3.Client, exists bool) {
@@ -69,7 +67,7 @@ func ConnectToEtcd() *clientv3.Client {
 			},
 		)
 		if err != nil {
-			logger.Exception(err)
+			logger.Error(err)
 			os.Exit(-1)
 		}
 		return cli
@@ -123,7 +121,7 @@ func main() {
 	listener, err := reuseport.Listen("tcp4", host)
 	err = server.Serve(listener)
 	if err != nil {
-		logger.Exception(err)
+		logger.Error(err)
 		os.Exit(-1)
 	}
 }
