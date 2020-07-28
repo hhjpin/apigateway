@@ -72,41 +72,6 @@ func ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	defer fasthttp.ReleaseResponse(revRes)
 	defer fasthttp.ReleaseURI(revReqUri)
 
-	//defer func() {
-	//var resContentType []byte
-	//
-	//if revRes != nil {
-	//	resContentType = revRes.Header.ContentType()
-	//}
-	//
-	//counting := middleware.NewCounting(
-	//	ctx.ConnTime().UnixNano(),
-	//	time.Now().UnixNano(),
-	//	ctx.Path(),
-	//	ctx.Method(),
-	//	target.svr,
-	//	target.host,
-	//	target.uri,
-	//	ctx.Request.Header.ContentType(),
-	//	resContentType,
-	//	revReqHeader,
-	//	revReqUrlParam,
-	//	ctx.Response.StatusCode(),
-	//	ctx.Request.Body(),
-	//	ctx.Response.Body(),
-	//)
-	//go func() {
-	//	hashed := murmur.Sum32(strconv.FormatUint(ctx.ConnID(), 10)) % middleware.CountingShardNumber
-	//	timer := time.NewTimer(5 * time.Second)
-	//	select {
-	//	case <-timer.C:
-	//		logger.Warn("Counting channel maybe full")
-	//	case middleware.CountingCh[hashed] <- counting:
-	//		// pass
-	//	}
-	//}()
-	//}()
-
 	routingTable := ctx.UserValue("Table")
 
 	if routingTable == nil {

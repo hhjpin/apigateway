@@ -2,61 +2,54 @@
 
 ####环境准备
 
-1. docker > 17.10 & docker-compose > 3.5
-2. go 1.10
+go >= 1.12
 
 ####项目编译方式
 
-1. 切换到项目目录下
-2. bash make.sh $version
-3. version tag 根据 registry.henghajiang.com 私有仓库中当前镜像版本决定
+go build
 
 #### 代码结构说明
 
 ```
-|
-|--- conf							// 配置文件工具方法包
-|--- core							// gateway核心组件
-|--- --- constant					// 核心组件常量定义
-|--- --- --- bytes.go				// 常量byte slice版本(性能优化)
-|--- --- --- const.go				// 常量定义
-|--- --- options					// gateway核心组件配置选项
-|--- --- --- option.go				// gateway核心组件配置选项结构体定义
-|--- --- routing					// 路由及其相关组件
+|--- conf                           // 配置文件工具方法包
+|--- core                           // gateway核心组件
+|--- --- constant                   // 核心组件常量定义
+|--- --- --- bytes.go               // 常量byte slice版本(性能优化)
+|--- --- --- const.go               // 常量定义
+|--- --- options                    // gateway核心组件配置选项
+|--- --- --- option.go              // gateway核心组件配置选项结构体定义
+|--- --- routing                    // 路由及其相关组件
 |--- --- --- base.go				
-|--- --- --- etcd.go				// etcd存取方法
-|--- --- --- health_check.go		// 健康检查组件
-|--- --- --- proxy.go				// 代理模块, 处理预置/后置中间件
-|--- --- --- routing.go				// 路由模块
-|--- --- --- tables.go				// 协程安全的各式路由表定义
+|--- --- --- etcd.go                // etcd存取方法
+|--- --- --- health_check.go        // 健康检查组件
+|--- --- --- proxy.go               // 代理模块, 处理预置/后置中间件
+|--- --- --- routing.go             // 路由模块
+|--- --- --- tables.go              // 协程安全的各式路由表定义
 |--- --- utils
-|--- --- --- utils.go				// 工具方法集合
-|--- --- watcher					// Watcher组件
+|--- --- --- utils.go               // 工具方法集合
+|--- --- watcher                    // Watcher组件
 |--- --- --- base.go				
-|--- --- --- endpoint.go			// endpoint/node watcher 定义
-|--- --- --- health_check.go		// healthCheck watcher 定义
-|--- --- --- route.go				// route watcher 定义
-|--- --- --- service.go				// service watcher 定义
-|--- --- --- watcher.go				// Watcher Interface
-|--- dashboard						// 监控平台Api
-|--- middleware						// 中间件组件
-|--- --- auth.go					// 认证中间件
-|--- --- count.go					// 计数器中间件
-|--- --- limit.go					// 限流中间件
-|--- --- base.go					// 中间件 Middleware Interface
+|--- --- --- endpoint.go            // endpoint/node watcher 定义
+|--- --- --- health_check.go        // healthCheck watcher 定义
+|--- --- --- route.go               // route watcher 定义
+|--- --- --- service.go             // service watcher 定义
+|--- --- --- watcher.go             // Watcher Interface
+|--- dashboard                      // 监控平台Api
+|--- middleware                     // 中间件组件
+|--- --- auth.go                    // 认证中间件
+|--- --- count.go                   // 计数器中间件
+|--- --- limit.go                   // 限流中间件
+|--- --- base.go                    // 中间件 Middleware Interface
 |--- sdk							
 |--- --- golang					
 |--- --- --- const.go
 |--- --- --- gw_sdk.go
-|--- --- python
-|--- --- --- const.py
-|--- --- --- gw_sdk.py
-|--- server.go						// Server 入口
+|--- server.go                      // Server 入口
 ```
 
 #### 优化说明
 
-1. server.go: line 121, 使用了 Tcp SO_REUSEPORT Option, 若后续部署时系统不支持该 Tcp 选项, 可以更换为普通Listener
+1. server.go: 使用了 Tcp SO_REUSEPORT Option, 若后续部署时系统不支持该 Tcp 选项, 可以更换为普通Listener
 2. 不要在proxy.go中打印任何关于经由Api Gateway的请求报文的string类型日志, 大批量的打印日志将会导致频繁触发GC, 降低处理能力
 
 #### 备注
