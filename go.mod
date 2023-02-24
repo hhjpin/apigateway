@@ -30,13 +30,9 @@ require (
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.uber.org/atomic v1.5.1 // indirect
 	go.uber.org/multierr v1.4.0 // indirect
-	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413 // indirect
 	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
-	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 // indirect
-	golang.org/x/sys v0.0.0-20191210023423-ac6580df4449 // indirect
-	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	golang.org/x/tools v0.0.0-20191210221141-98df12377212 // indirect
 	google.golang.org/genproto v0.0.0-20191205163323-51378566eb59 // indirect
 	google.golang.org/grpc v1.25.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
